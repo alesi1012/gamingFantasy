@@ -35,15 +35,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="ApiCall"
-        options={{
-          title: 'ApiCall',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} color={color} size={24} />
-          ),
-        }}
-      />
     </Tabs>
   );
 }
