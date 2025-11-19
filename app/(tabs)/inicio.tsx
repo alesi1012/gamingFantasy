@@ -23,7 +23,6 @@ export default function Inicio() {
                 >
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                     style={{
                         backgroundColor: '#3684B5',
