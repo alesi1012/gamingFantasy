@@ -115,7 +115,7 @@ export default function Inicio() {
                                     <Text style={[styles.title, index === 0 ? {} : { color: 'white' }]}>{liga.nombre}</Text>
                                     <Text style={[styles.subtitle, index === 0 ? {} : { color: 'white' }]}>
                                         {/* Aquí podrías agregar datos reales, por ejemplo número de usuarios y puntos */}
-                                        Miembros: N/A Pts: N/A
+                                        Miembros: {liga.miembros}/14 Pts: {liga.puntos}
                                     </Text>
                                 </View>
                             </View>
