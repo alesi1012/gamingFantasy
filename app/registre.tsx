@@ -24,7 +24,7 @@ export default function Registre() {
 
     function registrar() {
 
-        fetch('http://localhost:5432/login', {
+        fetch('http://localhost:3000/registre', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ export default function Registre() {
 
     function registrarConId() {
 
-        fetch('http://localhost:5432/registrarConId', {
+        fetch('http://localhost:3000/registrarConId', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
