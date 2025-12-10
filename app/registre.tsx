@@ -7,6 +7,7 @@ export default function Registre() {
 
     const [Usuari, setUsuari] = useState("");
     const [Correu, setCorreu] = useState("");
+    const [Idsupercell, setIdSupercell] = useState("");
     const [Contrasenya, setContrasenya] = useState("");
     const [CContrasenya, setCContrasenya] = useState("");
 
@@ -31,6 +32,32 @@ export default function Registre() {
             body: JSON.stringify({
                 Usuari,
                 Correu,
+                Contrasenya,
+            }),
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                console.log(data);
+                if (data.error) {
+                    alert(data.error)
+                } else {
+                    alert('Correu enviat correctamente');
+                    router.push('/inici_sessio');
+                }
+            })
+    }
+
+    function registrarConId() {
+
+        fetch('http://localhost:5432/registrarConId', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                Usuari,
+                Correu,
+                Idsupercell,
                 Contrasenya,
             }),
         })
@@ -89,6 +116,21 @@ export default function Registre() {
                         onChangeText={(text) => setCorreu(text)}
                     />
 
+                    <Text style={{color: '#fff', fontSize: 18, marginBottom: 5}}>Supercell ID</Text>
+                    <TextInput
+                        placeholder="Supercell ID"
+                        placeholderTextColor="#bbb"
+                        style={{
+                            backgroundColor: '#1c1c1c',
+                            color: 'white',
+                            padding: 12,
+                            borderRadius: 8,
+                            marginBottom: 20,
+                            fontSize: 16,
+                        }}
+                        onChangeText={(text) => setIdSupercell(text)}
+                    />
+
                     <Text style={{color: '#fff', fontSize: 18, marginBottom: 5}}>Contrasenya</Text>
                     <TextInput
                         placeholder="Contrasenya"
@@ -129,8 +171,14 @@ export default function Registre() {
                             alignItems: 'center',
                         }}
                         onPress={() => {
-                            console.log({Usuari}, {Correu}, {Contrasenya}, {CContrasenya})
-                            if (Usuari && Correu && Contrasenya && CContrasenya) {
+                            console.log({Usuari}, {Correu}, {Contrasenya}, {CContrasenya}, {Idsupercell});
+                            if (Usuari && Correu && Contrasenya && CContrasenya && Idsupercell) {
+                                if (Contrasenya === CContrasenya) {
+                                    registrarConId();
+                                } else {
+                                    alert('Contrasenyes no coincideixen');
+                                }
+                            } else if (Usuari && Correu && Contrasenya && CContrasenya) {
                                 if (Contrasenya === CContrasenya) {
                                     registrar();
                                 } else {
@@ -139,7 +187,8 @@ export default function Registre() {
                             } else {
                                 alert('Camps buits');
                             }
-                        }}>
+                        }
+                        }>
                         <Text style={{color: 'white', fontWeight: 'bold', fontSize: 20}}>
                             Registrar-se
                         </Text>
