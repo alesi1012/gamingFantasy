@@ -1,15 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView } from 'react-native';
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useNavigation } from '@react-navigation/native';
+import { useRouter } from "expo-router";
+import { LigaContext } from "./_layout";  // CONTEXT GLOBAL
 
 const isWeb = Platform.OS === 'web';
 
 export default function Inicio() {
     const [ligas, setLigas] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [ligaSeleccionada, setLigaSeleccionada] = useState(null);
+
+    const navigation = useNavigation();
+    const router = useRouter();
+
+    const { setLiga } = useContext(LigaContext);   // <<< AÑADIDO
 
     const usuarioId = "34d84e35-c84c-4590-8331-3d8e5318f42d";
-
 
     const fetchLigas = async () => {
         setLoading(true);
@@ -20,8 +28,14 @@ export default function Inicio() {
                 setLoading(false);
                 return;
             }
+
             const data = await res.json();
             setLigas(data);
+            setLigaSeleccionada(data[0] || null);
+
+            // Guardar también en global si existe
+            if (data[0]) setLiga(data[0]);
+
         } catch (error) {
             alert('Error de red: ' + error.message);
         } finally {
@@ -29,13 +43,12 @@ export default function Inicio() {
         }
     };
 
-
     useEffect(() => {
         fetchLigas();
     }, []);
 
     const crearLiga = async () => {
-        let nombreLiga = '';
+        let nombreLiga: string | null = "";
 
         if (isWeb) {
             nombreLiga = window.prompt("Ingresa el nombre de la nueva liga:");
@@ -44,7 +57,7 @@ export default function Inicio() {
                 return;
             }
         } else {
-            alert('Implementa un modal para pedir nombre de liga en móvil');
+            alert('Implementa modal para móvil');
             return;
         }
 
@@ -72,27 +85,33 @@ export default function Inicio() {
         }
     };
 
+    // NUEVA VERSIÓN — guarda en context + mantiene params para compatibilidad
+    const irAClasificacion = (liga) => {
+        setLigaSeleccionada(liga);
+        setLiga(liga);  // GUARDAR GLOBALMENTE
+
+        router.push({
+            pathname: "/(tabs)/clasificacion",
+            params: { liga: JSON.stringify(liga) }
+        });
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: 'black' }}>
             <StatusBar backgroundColor={'#000'} />
+
             <View style={{ alignItems: 'center', marginTop: 20 }}>
                 <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>
                     Fantasy Gamer
                 </Text>
             </View>
+
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
-                <TouchableOpacity
-                    style={styles.buton1}
-                    onPress={() => alert('Botón 1 presionado')}
-                >
+                <TouchableOpacity style={styles.buton1} onPress={() => alert('Unirse')}>
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={styles.buton2}
-                    onPress={crearLiga}
-                >
+                <TouchableOpacity style={styles.buton2} onPress={crearLiga}>
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Crear liga</Text>
                 </TouchableOpacity>
             </View>
@@ -103,25 +122,34 @@ export default function Inicio() {
                 ) : ligas.length === 0 ? (
                     <Text style={{ color: 'white', textAlign: 'center' }}>No tienes ligas.</Text>
                 ) : (
-                    ligas.map((liga, index) => (
-                        <TouchableOpacity
-                            key={liga.id || index}
-                            style={[styles.card, index === 0 ? styles.cardSelected : styles.cardBlue]}
-                            onPress={() => alert(`Entrando a ${liga.nombre}`)}
-                        >
-                            <View style={styles.infoContainer}>
-                                <View style={[styles.avatar, { backgroundColor: index === 0 ? "#ccc" : "#0D47A1" }]} />
-                                <View>
-                                    <Text style={[styles.title, index === 0 ? {} : { color: 'white' }]}>{liga.nombre}</Text>
-                                    <Text style={[styles.subtitle, index === 0 ? {} : { color: 'white' }]}>
-                                        {/* Aquí podrías agregar datos reales, por ejemplo número de usuarios y puntos */}
-                                        Miembros: {liga.miembros}/14 Pts: {liga.puntos}
-                                    </Text>
+                    ligas.map((liga, index) => {
+                        const isSelected = ligaSeleccionada?.id === liga.id;
+
+                        return (
+                            <TouchableOpacity
+                                key={liga.id || index}
+                                style={[styles.card, isSelected ? styles.cardSelected : styles.cardBlue]}
+                                onPress={() => {
+                                    setLigaSeleccionada(liga);
+                                    setLiga(liga);
+                                }}
+                            >
+                                <View style={styles.infoContainer}>
+                                    <View style={[styles.avatar, { backgroundColor: isSelected ? "#ccc" : "#0D47A1" }]} />
+                                    <View>
+                                        <Text style={[styles.title, !isSelected && { color: 'white' }]}>{liga.nombre}</Text>
+                                        <Text style={[styles.subtitle, !isSelected && { color: 'white' }]}>
+                                            Miembros: {liga.miembros}/14  Pts: {liga.puntos}
+                                        </Text>
+                                    </View>
                                 </View>
-                            </View>
-                            <Ionicons name="stats-chart" size={24} color={index === 0 ? "#555" : "white"} />
-                        </TouchableOpacity>
-                    ))
+
+                                <TouchableOpacity onPress={() => irAClasificacion(liga)}>
+                                    <Ionicons name="stats-chart" size={24} color={isSelected ? "#555" : "white"} />
+                                </TouchableOpacity>
+                            </TouchableOpacity>
+                        );
+                    })
                 )}
             </ScrollView>
         </View>
@@ -162,6 +190,7 @@ const styles = StyleSheet.create({
     cardSelected: {
         borderWidth: 2,
         borderColor: "#9C27B0",
+        backgroundColor: "white"
     },
     cardBlue: {
         backgroundColor: "#1565C0",
@@ -175,7 +204,6 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: "#ccc",
     },
     title: {
         fontSize: 16,
