@@ -15,7 +15,7 @@ export default function Inicio() {
     const navigation = useNavigation();
     const router = useRouter();
 
-    const { setLiga } = useContext(LigaContext);   // <<< AÑADIDO
+    const { setLiga } = useContext(LigaContext);
 
     const usuarioId = "34d84e35-c84c-4590-8331-3d8e5318f42d";
 
