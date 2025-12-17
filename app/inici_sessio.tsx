@@ -13,11 +13,11 @@ export default function Inici_sessio() {
 
     const [Contrasenya, setContrasenya] = useState("");
 
-    function iniciarSessio() {
-        const usuariEscapat = encodeURIComponent(Usuari);
-        const contrasenyaEscapada = encodeURIComponent(Contrasenya);
+    const [loged, setLoged] = useState(false);
 
-        fetch(`http://localhost:3000/player:${usuariEscapat},:${contrasenyaEscapada}`, {
+    function iniciarSessio() {
+
+        fetch(`http://localhost:3000/player?Usuari=${encodeURIComponent(Usuari)}`, {
             method: 'GET',
         })
             .then((response) => response.json())
@@ -28,6 +28,7 @@ export default function Inici_sessio() {
                 } else if (data.usuari) {
                     if (data.usuari.password === Contrasenya && data.usuari.nombre === Usuari) {
                         alert('Usuari iniciat sessió correctamente');
+                        setLoged(true);
                         router.push('/inicio');
                     } else {
                         alert('Usuari o contrasenya incorrectes');
