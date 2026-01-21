@@ -85,7 +85,7 @@ export default function Inicio() {
         }
     };
 
-    // NUEVA VERSIÓN — guarda en context + mantiene params para compatibilidad
+    //guarda en context + mantiene params para compatibilidad
     const irAClasificacion = (liga) => {
         setLigaSeleccionada(liga);
         setLiga(liga);  // GUARDAR GLOBALMENTE
