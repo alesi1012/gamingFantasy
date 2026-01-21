@@ -2,6 +2,8 @@ import {View, Text, TouchableOpacity, StatusBar, TextInput, Image, Platform, Scr
 import type {ViewStyle} from 'react-native';
 import {router} from "expo-router";
 import {useState} from "react";
+import { useUser } from './UserContext';
+
 
 export default function Inici_sessio() {
 
@@ -14,8 +16,9 @@ export default function Inici_sessio() {
     const [Contrasenya, setContrasenya] = useState("");
 
     const [loged, setLoged] = useState(false);
-
+    const { setUser } = useUser();
     function iniciarSessio() {
+
 
         fetch(`http://localhost:3000/player?Usuari=${encodeURIComponent(Usuari)}`, {
             method: 'GET',
@@ -29,7 +32,14 @@ export default function Inici_sessio() {
                     if (data.usuari.password === Contrasenya && data.usuari.nombre === Usuari) {
                         alert('Usuari iniciat sessió correctamente');
                         setLoged(true);
-                        router.push('/inicio');
+                        setUser({
+                            nombre: data.usuari.nombre,
+                            codigo_cr: data.usuari.codigo_cr,
+                        });
+                        router.push({
+                            pathname: '/inicio',
+                            params: { nombrePerfil: Usuari }
+                        });
                     } else {
                         alert('Usuari o contrasenya incorrectes');
                     }

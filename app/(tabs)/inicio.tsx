@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView } from 'react-native';
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from '@react-navigation/native';
-import { useRouter } from "expo-router";
+import {useLocalSearchParams, useRouter} from "expo-router";
 import { LigaContext } from "./_layout";  // CONTEXT GLOBAL
 
 const isWeb = Platform.OS === 'web';
@@ -11,7 +11,7 @@ export default function Inicio() {
     const [ligas, setLigas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [ligaSeleccionada, setLigaSeleccionada] = useState(null);
-
+    const { nombrePerfil } = useLocalSearchParams();
     const navigation = useNavigation();
     const router = useRouter();
 
