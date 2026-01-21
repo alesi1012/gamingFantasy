@@ -160,8 +160,8 @@ export default function Clasificacion(): JSX.Element {
                                     <TouchableOpacity
                                         onPress={() =>
                                             router.push({
-                                                pathname: "/estadistiques",
-                                                params: { codigo_cr: m.codigo_cr ?? "" },
+                                                pathname: "/estadistiquesUser",
+                                                params: { nombre: m.nombre },
                                             })
                                         }
                                         style={styles.actionBtn}
