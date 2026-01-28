@@ -4,6 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from '@react-navigation/native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { LigaContext } from "./_layout";  // CONTEXT GLOBAL
+import { useUser } from '../UserContext';
 
 const isWeb = Platform.OS === 'web';
 
@@ -14,15 +15,16 @@ export default function Inicio() {
     const { nombrePerfil } = useLocalSearchParams();
     const navigation = useNavigation();
     const router = useRouter();
+    const { user } = useUser();
 
     const { setLiga } = useContext(LigaContext);
 
-    const usuarioId = "34d84e35-c84c-4590-8331-3d8e5318f42d";
+    const usuarioNombre = user?.nombre;
 
     const fetchLigas = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/mis-ligas/${usuarioId}`);
+            const res = await fetch(`http://localhost:3000/mis-ligas/${usuarioNombre}`);
             if (!res.ok) {
                 alert('Error al cargar ligas');
                 setLoading(false);
@@ -33,7 +35,7 @@ export default function Inicio() {
             setLigas(data);
             setLigaSeleccionada(data[0] || null);
 
-            // Guardar también en global si existe
+
             if (data[0]) setLiga(data[0]);
 
         } catch (error) {
@@ -67,7 +69,7 @@ export default function Inicio() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     nombre: nombreLiga,
-                    usuario_id: usuarioId,
+                    nombre_usuario: usuarioNombre,
                 }),
             });
 
@@ -85,10 +87,10 @@ export default function Inicio() {
         }
     };
 
-    // NUEVA VERSIÓN — guarda en context + mantiene params para compatibilidad
+
     const irAClasificacion = (liga) => {
         setLigaSeleccionada(liga);
-        setLiga(liga);  // GUARDAR GLOBALMENTE
+        setLiga(liga);
 
         router.push({
             pathname: "/(tabs)/clasificacion",
