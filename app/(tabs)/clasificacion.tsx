@@ -27,7 +27,7 @@ export default function Clasificacion(): JSX.Element {
 
     const { liga: ligaGlobal } = useContext(LigaContext);
 
-    // --- NORMALIZAR PARAMS (compatibilidad completa) ---
+
     const rawLiga =
         typeof params.liga === "string"
             ? params.liga
@@ -35,11 +35,7 @@ export default function Clasificacion(): JSX.Element {
                 ? params.liga[0]
                 : null;
 
-    // ----------------------------------------------------------------
-    // CAMBIO IMPORTANTE: damos **prioridad al LigaContext (ligaGlobal)**.
-    // Si existe ligaGlobal la usamos (es la selección más reciente del inicio).
-    // Si no existe, entonces intentamos parsear params.liga para compatibilidad.
-    // ----------------------------------------------------------------
+
     const ligaObj = useMemo(() => {
         if (ligaGlobal) {
             return ligaGlobal;
@@ -105,10 +101,13 @@ export default function Clasificacion(): JSX.Element {
                 <Text style={styles.title}>Clasificación — {ligaObj.nombre}</Text>
 
                 <TouchableOpacity
-                    onPress={() => AlertInvitar()}
-                    style={styles.inviteButton}
-                    accessibilityLabel="Invitar a la liga"
-                >
+                    onPress={Invitar =>
+                        router.push({
+                            pathname: "invitar_liga",
+                            params: { liga: JSON.stringify(ligaObj) },
+                        })
+
+                    }>
                     <Ionicons name="person-add" size={20} color="white" />
                 </TouchableOpacity>
             </View>
@@ -182,7 +181,7 @@ export default function Clasificacion(): JSX.Element {
         alert(`Retando usuario ${m.nombre}`);
     }
 
-    function AlertInvitar() {
+    function Invitar() {
         alert("Invitando usuarios...");
     }
 }
