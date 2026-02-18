@@ -177,7 +177,7 @@ export default function Clasificacion(): JSX.Element {
         </View>
     );
 
-    // Helpers
+
     function AlertRetar(m: Miembro) {
         alert(`Retando usuario ${m.nombre}`);
     }

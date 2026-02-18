@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollVi
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from '@react-navigation/native';
 import {useLocalSearchParams, useRouter} from "expo-router";
-import { LigaContext } from "./_layout";  // CONTEXT GLOBAL
+import { LigaContext } from "./_layout";
+import {useUser} from "@/app/UserContext";  // CONTEXT GLOBAL
 
 const isWeb = Platform.OS === 'web';
 
@@ -17,12 +18,18 @@ export default function Inicio() {
 
     const { setLiga } = useContext(LigaContext);
 
-    const usuarioId = "34d84e35-c84c-4590-8331-3d8e5318f42d";
+    const { user, logout } = useUser();
+
+    console.log('Usuario actual:', user);
 
     const fetchLigas = async () => {
+        if (!user?.id) {
+            return;
+        }
+
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/mis-ligas/${usuarioId}`);
+            const res = await fetch(`http://localhost:3000/mis-ligas-id/${user.id}`);
             if (!res.ok) {
                 alert('Error al cargar ligas');
                 setLoading(false);
@@ -32,8 +39,6 @@ export default function Inicio() {
             const data = await res.json();
             setLigas(data);
             setLigaSeleccionada(data[0] || null);
-
-            // Guardar también en global si existe
             if (data[0]) setLiga(data[0]);
 
         } catch (error) {
@@ -44,8 +49,10 @@ export default function Inicio() {
     };
 
     useEffect(() => {
-        fetchLigas();
-    }, []);
+        if (user?.id) {
+            fetchLigas();
+        }
+    }, [user?.id]);
 
     const crearLiga = async () => {
         let nombreLiga: string | null = "";
@@ -67,7 +74,7 @@ export default function Inicio() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     nombre: nombreLiga,
-                    usuario_id: usuarioId,
+                    usuario_id: user?.id,
                 }),
             });
 
@@ -84,11 +91,46 @@ export default function Inicio() {
             alert("Error de red: " + error.message);
         }
     };
+    const unirseLiga = async () => {
+        let codigo: string | null = null;
 
-    // NUEVA VERSIÓN — guarda en context + mantiene params para compatibilidad
+        if (isWeb) {
+            codigo = window.prompt("Introduce el código de la liga:");
+        } else {
+            alert("Implementa modal para móvil");
+            return;
+        }
+
+        if (!codigo) return;
+
+        try {
+            const res = await fetch("http://localhost:3000/unirse-liga", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    usuario_id: user?.id,
+                    codigo_liga: codigo.trim().toUpperCase(),
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Error al unirse");
+                return;
+            }
+
+            alert("Te uniste a la liga correctamente");
+            fetchLigas(); // refresca lista automáticamente
+
+        } catch (err) {
+            alert("Error de red: " + err.message);
+        }
+    };
+
     const irAClasificacion = (liga) => {
         setLigaSeleccionada(liga);
-        setLiga(liga);  // GUARDAR GLOBALMENTE
+        setLiga(liga);
 
         router.push({
             pathname: "/(tabs)/clasificacion",
@@ -100,14 +142,27 @@ export default function Inicio() {
         <View style={{ flex: 1, backgroundColor: 'black' }}>
             <StatusBar backgroundColor={'#000'} />
 
-            <View style={{ alignItems: 'center', marginTop: 20 }}>
+            <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
                 <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>
                     Fantasy Gamer
                 </Text>
+
+                {user && (
+                    <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={() => {
+                            logout();
+                            alert('Sesión cerrada');
+                            router.replace('/');
+                        }}
+                    >
+                        <Text style={{ color: 'white', fontWeight: 'bold' }}>Cerrar sesión</Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
-                <TouchableOpacity style={styles.buton1} onPress={() => alert('Unirse')}>
+                <TouchableOpacity style={styles.buton1} onPress={unirseLiga}>
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
                 </TouchableOpacity>
 
@@ -213,4 +268,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         opacity: 0.7,
     },
+    logoutButton: {
+        marginTop: 10,
+        backgroundColor: '#d33',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 8,
+    }
 });
