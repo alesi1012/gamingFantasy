@@ -4,7 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from '@react-navigation/native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { LigaContext } from "./_layout";
-import {useUser} from "@/app/UserContext";  // CONTEXT GLOBAL
+import {useUser} from "@/app/UserContext";
 
 const isWeb = Platform.OS === 'web';
 
@@ -74,7 +74,7 @@ export default function Inicio() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     nombre: nombreLiga,
-                    usuario_id: usuarioId,
+                    usuario_id: user?.id,
                 }),
             });
 
@@ -91,6 +91,7 @@ export default function Inicio() {
             alert("Error de red: " + error.message);
         }
     };
+
     const unirseLiga = async () => {
         let codigo: string | null = null;
 
@@ -121,7 +122,7 @@ export default function Inicio() {
             }
 
             alert("Te uniste a la liga correctamente");
-            fetchLigas(); // refresca lista automáticamente
+            fetchLigas();
 
         } catch (err) {
             alert("Error de red: " + err.message);
