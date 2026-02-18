@@ -8,87 +8,50 @@ import {
     ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-
 import { useUser } from "./UserContext";
 
-interface Arena {
-    name: string;
-}
-interface Clan {
-    name: string;
-}
-interface FavoriteCard {
-    name: string;
-}
-interface Card {
-    name: string;
-    id: number;
-    level: number;
-    iconUrls: { medium: string };
-}
-interface PlayerData {
-    name: string;
-    trophies: number;
-    wins: number;
-    threeCrownWins: number;
-    bestTrophies: number;
-    totalDonations: number;
-    role: string;
-    warDayWins: number;
-    arena?: Arena;
-    clan?: Clan;
-    currentDeck?: Card[];
-    cards?: Card[];
-    currentFavouriteCard?: FavoriteCard;
-}
+interface PlayerData { /* tu interfaz aquí igual que antes */ }
 
 export default function EstadistiquesUser() {
     const params = useLocalSearchParams();
     const nombre = params.nombre as string | undefined;
+    const { user } = useUser();
 
-    const [data, setData] = useState<PlayerData | null>(null);
+    const [dataUserParam, setDataUserParam] = useState<PlayerData | null>(null);
+    const [dataUserLogged, setDataUserLogged] = useState<PlayerData | null>(null);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        async function fetchData() {
-            if (!nombre) {
-                setError("No se proporcionó el nombre de usuario.");
-                setLoading(false);
-                return;
-            }
+    async function fetchPlayerStats(nombreUsuario: string | undefined) {
+        if (!nombreUsuario) return null;
+        try {
+            const res = await fetch(`http://localhost:3000/players/${encodeURIComponent(nombreUsuario)}`);
+            if (!res.ok) throw new Error(`Error ${res.status}`);
+            return await res.json();
+        } catch {
+            return null;
+        }
+    }
 
+    useEffect(() => {
+        async function fetchBoth() {
             setLoading(true);
             setError(null);
 
-            try {
-                const res = await fetch(`http://localhost:3000/players/${encodeURIComponent(nombre)}`);
+            const datosParam = await fetchPlayerStats(nombre);
+            const datosLogged = user ? await fetchPlayerStats(user.nombre) : null;
 
-                if (!res.ok) {
-                    if (res.status === 400) {
-                        setError("El usuario no tiene código Clash Royale registrado.");
-                    } else if (res.status === 404) {
-                        setError("Usuario no encontrado en la base de datos.");
-                    } else {
-                        setError(`Error al obtener estadísticas: ${res.status}`);
-                    }
-                    setData(null);
-                    setLoading(false);
-                    return;
-                }
-
-                const json = await res.json();
-                setData(json);
-            } catch (e) {
-                setError("Error de conexión con el servidor.");
-                setData(null);
-            } finally {
-                setLoading(false);
+            if (!datosParam && !datosLogged) {
+                setError("No se pudieron cargar las estadísticas de ninguno de los usuarios.");
             }
-        }
 
-        fetchData();
-    }, [nombre]);
+            setDataUserParam(datosParam);
+            setDataUserLogged(datosLogged);
+            setLoading(false);
+        }
+        fetchBoth();
+    }, [nombre, user]);
 
     if (loading) {
         return (
@@ -106,82 +69,79 @@ export default function EstadistiquesUser() {
         );
     }
 
-    if (!data) {
+    if (!dataUserParam && !dataUserLogged) {
         return (
             <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-                <Text style={{ color: "white" }}>No se pudieron cargar los datos</Text>
+                <Text style={{ color: "white" }}>No hay datos para mostrar</Text>
             </View>
         );
     }
 
-    const arenaName = data.arena?.name ?? "Desconocida";
-    const clanName = data.clan?.name ?? "Sin clan";
-    const favCardName = data.currentFavouriteCard?.name ?? "Ninguna";
+    // Función para comparar y devolver el mejor valor con su dueño
+    function mejorEstadistica(
+        statKey: keyof PlayerData,
+        label: string,
+    ) {
+        const val1 = dataUserParam?.[statKey] ?? -Infinity;
+        const val2 = dataUserLogged?.[statKey] ?? -Infinity;
+
+        if (val1 === -Infinity && val2 === -Infinity) return null;
+
+        const mejorValor = val1 >= val2 ? val1 : val2;
+        const dueño = val1 >= val2 ? dataUserParam?.name : dataUserLogged?.name;
+
+        return (
+            <View style={styles.statBox}>
+                <Text style={styles.statLabel}>{label}</Text>
+                <Text style={styles.statValue}>
+                    {mejorValor} ({dueño})
+                </Text>
+            </View>
+        );
+    }
 
     return (
         <ScrollView style={styles.container}>
-            {/* MAZO */}
-            <View style={{ flexDirection: "row", marginBottom: 20 }}>
-                {data.currentDeck?.map((card) => (
-                    <View key={card.id} style={styles.card}>
-                        <Image source={{ uri: card.iconUrls.medium }} style={styles.image} />
-                        <Text style={styles.cardName}>{card.name}</Text>
-                        <Text style={styles.cardLevel}>Level {card.level}</Text>
+
+            {/* Mostrar mazos, clanes y carta favorita para ambos */}
+            {[dataUserParam, dataUserLogged].map((data, idx) =>
+                data ? (
+                    <View key={idx} style={{ marginBottom: 30 }}>
+                        <Text style={styles.title}>Estadísticas de {data.name}</Text>
+
+                        <Text style={styles.sectionTitle}>Mazo activo</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                            {data.currentDeck?.map((card) => (
+                                <View key={card.id} style={styles.card}>
+                                    <Image source={{ uri: card.iconUrls.medium }} style={styles.image} />
+                                    <Text style={styles.cardName}>{card.name}</Text>
+                                    <Text style={styles.cardLevel}>Level {card.level}</Text>
+                                </View>
+                            )) || <Text style={{ color: "white" }}>No hay mazo activo</Text>}
+                        </ScrollView>
+
+                        <Text style={styles.sectionTitle}>Clan</Text>
+                        <Text style={{ color: "white", marginBottom: 10 }}>
+                            {data.clan?.name ?? "Sin clan"}
+                        </Text>
+
+                        <Text style={styles.sectionTitle}>Carta favorita</Text>
+                        <Text style={{ color: "white", marginBottom: 10 }}>
+                            {data.currentFavouriteCard?.name ?? "Ninguna"}
+                        </Text>
                     </View>
-                )) || <Text style={{ color: "white" }}>No hay mazo activo</Text>}
-            </View>
+                ) : null
+            )}
 
-            <Text style={styles.title}>{data.name}</Text>
-
-            <Text style={styles.sectionTitle}>Copas</Text>
-
-            <View style={styles.box}>
-                <Text style={styles.boxText}>Trofeos: {data.trophies}</Text>
-                <Text style={styles.boxText}>Arena: {arenaName}</Text>
-            </View>
-
+            {/* Comparar estadísticas y mostrar solo la mejor */}
+            <Text style={styles.title}>Comparación de estadísticas</Text>
             <View style={styles.statsGrid}>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Victorias</Text>
-                    <Text style={styles.statValue}>{data.wins}</Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>3 coronas</Text>
-                    <Text style={styles.statValue}>{data.threeCrownWins}</Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Máximo de trofeos</Text>
-                    <Text style={styles.statValue}>{data.bestTrophies}</Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Donaciones</Text>
-                    <Text style={styles.statValue}>{data.totalDonations}</Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Cartas encontradas</Text>
-                    <Text style={styles.statValue}>
-                        {data.cards ? data.cards.length : 0}/121
-                    </Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Favorita</Text>
-                    <Text style={styles.statValue}>{favCardName}</Text>
-                </View>
-            </View>
-
-            <View style={styles.box}>
-                <Text style={styles.boxText}>Clan: {clanName}</Text>
-            </View>
-
-            <View style={styles.statsRow}>
-                <View style={styles.statRowBox}>
-                    <Text style={styles.statLabel}>Guerras ganadas</Text>
-                    <Text style={styles.statValue}>{data.warDayWins}</Text>
-                </View>
-                <View style={styles.statRowBox}>
-                    <Text style={styles.statLabel}>Rol</Text>
-                    <Text style={styles.statValue}>{data.role}</Text>
-                </View>
+                {mejorEstadistica("trophies", "Trofeos")}
+                {mejorEstadistica("wins", "Victorias")}
+                {mejorEstadistica("threeCrownWins", "3 coronas")}
+                {mejorEstadistica("bestTrophies", "Máximo de trofeos")}
+                {mejorEstadistica("totalDonations", "Donaciones")}
+                {mejorEstadistica("warDayWins", "Guerras ganadas")}
             </View>
         </ScrollView>
     );
@@ -204,16 +164,6 @@ const styles = StyleSheet.create({
         fontSize: 20,
         marginBottom: 10,
     },
-    box: {
-        backgroundColor: "#263fa0",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 20,
-    },
-    boxText: {
-        color: "white",
-        fontSize: 18,
-    },
     statsGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
@@ -234,16 +184,6 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 18,
         fontWeight: "bold",
-    },
-    statsRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-    },
-    statRowBox: {
-        width: "48%",
-        backgroundColor: "#ececec",
-        padding: 14,
-        borderRadius: 12,
     },
     card: {
         width: 100,

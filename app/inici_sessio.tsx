@@ -1,12 +1,12 @@
 import {View, Text, TouchableOpacity, StatusBar, TextInput, Image, Platform, ScrollView} from 'react-native';
 import type {ViewStyle} from 'react-native';
 import {router} from "expo-router";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import { useUser } from './UserContext';
 
 
 export default function Inici_sessio() {
-
+    const { user, setUser } = useUser();
     const containerStyle: ViewStyle = Platform.OS === "web"
         ? {width: "33%", alignSelf: "center", minWidth: 350}
         : {width: "100%"};
@@ -16,41 +16,40 @@ export default function Inici_sessio() {
     const [Contrasenya, setContrasenya] = useState("");
 
     const [loged, setLoged] = useState(false);
-    const { setUser } = useUser();
+    useEffect(() => {
+        if (user) {
+
+            router.replace({
+                pathname: "/inicio",
+                params: { nombrePerfil: user.nombre }
+            });
+        }
+    }, [user]);
     function iniciarSessio() {
-
-
-        fetch(`http://localhost:3000/player?Usuari=${encodeURIComponent(Usuari)}`, {
-            method: 'GET',
+        fetch("http://localhost:3000/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nombre: Usuari, password: Contrasenya }),
         })
-            .then((response) => response.json())
-            .then((data) => {
-                console.log(data);
+            .then(res => res.json())
+            .then(data => {
+                console.log("Respuesta login:", data);
                 if (data.error) {
                     alert(data.error);
                 } else if (data.usuari) {
-                    if (data.usuari.password === Contrasenya && data.usuari.nombre === Usuari) {
-                        alert('Usuari iniciat sessió correctamente');
-                        setLoged(true);
-                        setUser({
-                            nombre: data.usuari.nombre,
-                            codigo_cr: data.usuari.codigo_cr,
-                        });
-                        router.push({
-                            pathname: '/inicio',
-                            params: { nombrePerfil: Usuari }
-                        });
-                    } else {
-                        alert('Usuari o contrasenya incorrectes');
-                    }
-                } else {
-                    alert('Resposta inesperada del servidor');
+                    alert('Usuari iniciat sessió correctamente');
+                    setUser(data.usuari);
+                    router.push({
+                        pathname: '/inicio',
+                        params: { nombrePerfil: data.usuari.nombre }
+                    });
                 }
             })
-            .catch((err) => {
+            .catch(err => {
                 console.error(err);
-                alert('Error de connexió');
+                alert("Error de connexió");
             });
+
     }
 
 
