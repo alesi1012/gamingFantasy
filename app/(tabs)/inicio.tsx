@@ -84,6 +84,42 @@ export default function Inicio() {
             alert("Error de red: " + error.message);
         }
     };
+    const unirseLiga = async () => {
+        let codigo: string | null = null;
+
+        if (isWeb) {
+            codigo = window.prompt("Introduce el código de la liga:");
+        } else {
+            alert("Implementa modal para móvil");
+            return;
+        }
+
+        if (!codigo) return;
+
+        try {
+            const res = await fetch("http://localhost:3000/unirse-liga", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    usuario_id: usuarioId,
+                    codigo_liga: codigo.trim().toUpperCase(),
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                alert(data.error || "Error al unirse");
+                return;
+            }
+
+            alert("Te uniste a la liga correctamente");
+            fetchLigas(); // refresca lista automáticamente
+
+        } catch (err) {
+            alert("Error de red: " + err.message);
+        }
+    };
 
     //guarda en context + mantiene params para compatibilidad
     const irAClasificacion = (liga) => {
@@ -107,7 +143,7 @@ export default function Inicio() {
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
-                <TouchableOpacity style={styles.buton1} onPress={() => alert('Unirse')}>
+                <TouchableOpacity style={styles.buton1} onPress={unirseLiga}>
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
                 </TouchableOpacity>
 
