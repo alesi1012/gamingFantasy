@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView } from 'react-native';
+import React, {useEffect, useState, useContext} from 'react';
+import {View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView} from 'react-native';
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import {useLocalSearchParams, useRouter} from "expo-router";
-import { LigaContext } from "./_layout";  // CONTEXT GLOBAL
-import { useUser } from '../UserContext';
+import {LigaContext} from "./_layout";  // CONTEXT GLOBAL
+import {useUser} from '../UserContext';
 
 const isWeb = Platform.OS === 'web';
 
@@ -12,12 +12,12 @@ export default function Inicio() {
     const [ligas, setLigas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [ligaSeleccionada, setLigaSeleccionada] = useState(null);
-    const { nombrePerfil } = useLocalSearchParams();
+    const {nombrePerfil} = useLocalSearchParams();
     const navigation = useNavigation();
     const router = useRouter();
-    const { user } = useUser();
+    const {user} = useUser();
 
-    const { setLiga } = useContext(LigaContext);
+    const {setLiga} = useContext(LigaContext);
 
     const usuarioNombre = user?.nombre;
 
@@ -66,7 +66,7 @@ export default function Inicio() {
         try {
             const res = await fetch("http://localhost:3000/crear-liga", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     nombre: nombreLiga,
                     nombre_usuario: usuarioNombre,
@@ -85,6 +85,21 @@ export default function Inicio() {
         } catch (error) {
             alert("Error de red: " + error.message);
         }
+
+        const res = await fetch(`http://localhost:3000/player/${user?.nombre}/${nombreLiga}/points`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                usuario_id: user?.nombre,
+                nombre: nombreLiga
+            }),
+        });
+        console.log("res", res);
+        if (!res.ok) {
+            const errorData = await res.json();
+            alert("Error: " + (errorData.error?.message || "No se pudo assignar puntos iniciales"));
+            return;
+        }
     };
 
 
@@ -94,35 +109,35 @@ export default function Inicio() {
 
         router.push({
             pathname: "/(tabs)/clasificacion",
-            params: { liga: JSON.stringify(liga) }
+            params: {liga: JSON.stringify(liga)}
         });
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: 'black' }}>
-            <StatusBar backgroundColor={'#000'} />
+        <View style={{flex: 1, backgroundColor: 'black'}}>
+            <StatusBar backgroundColor={'#000'}/>
 
-            <View style={{ alignItems: 'center', marginTop: 20 }}>
-                <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>
+            <View style={{alignItems: 'center', marginTop: 20}}>
+                <Text style={{color: '#fff', fontSize: 32, fontWeight: 'bold'}}>
                     Fantasy Gamer
                 </Text>
             </View>
 
-            <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
+            <View style={{flexDirection: 'row', justifyContent: 'center', marginVertical: 20}}>
                 <TouchableOpacity style={styles.buton1} onPress={() => alert('Unirse')}>
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
+                    <Text style={{color: 'white', fontWeight: 'bold'}}>Unirse a una liga</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.buton2} onPress={crearLiga}>
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Crear liga</Text>
+                    <Text style={{color: 'white', fontWeight: 'bold'}}>Crear liga</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.container}>
                 {loading ? (
-                    <Text style={{ color: 'white', textAlign: 'center' }}>Cargando ligas...</Text>
+                    <Text style={{color: 'white', textAlign: 'center'}}>Cargando ligas...</Text>
                 ) : ligas.length === 0 ? (
-                    <Text style={{ color: 'white', textAlign: 'center' }}>No tienes ligas.</Text>
+                    <Text style={{color: 'white', textAlign: 'center'}}>No tienes ligas.</Text>
                 ) : (
                     ligas.map((liga, index) => {
                         const isSelected = ligaSeleccionada?.id === liga.id;
@@ -137,17 +152,18 @@ export default function Inicio() {
                                 }}
                             >
                                 <View style={styles.infoContainer}>
-                                    <View style={[styles.avatar, { backgroundColor: isSelected ? "#ccc" : "#0D47A1" }]} />
+                                    <View style={[styles.avatar, {backgroundColor: isSelected ? "#ccc" : "#0D47A1"}]}/>
                                     <View>
-                                        <Text style={[styles.title, !isSelected && { color: 'white' }]}>{liga.nombre}</Text>
-                                        <Text style={[styles.subtitle, !isSelected && { color: 'white' }]}>
-                                            Miembros: {liga.miembros}/14  Pts: {liga.puntos}
+                                        <Text
+                                            style={[styles.title, !isSelected && {color: 'white'}]}>{liga.nombre}</Text>
+                                        <Text style={[styles.subtitle, !isSelected && {color: 'white'}]}>
+                                            Miembros: {liga.miembros}/14 Pts: {liga.puntos}
                                         </Text>
                                     </View>
                                 </View>
 
                                 <TouchableOpacity onPress={() => irAClasificacion(liga)}>
-                                    <Ionicons name="stats-chart" size={24} color={isSelected ? "#555" : "white"} />
+                                    <Ionicons name="stats-chart" size={24} color={isSelected ? "#555" : "white"}/>
                                 </TouchableOpacity>
                             </TouchableOpacity>
                         );
