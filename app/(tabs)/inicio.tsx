@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView, Modal, TextInput } from 'react-native';
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from '@react-navigation/native';
-import {useLocalSearchParams, useRouter} from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { LigaContext } from "./_layout";
-import {useUser} from "@/app/UserContext";
+import { useUser } from "../UserContext";
 
 const isWeb = Platform.OS === 'web';
 
@@ -12,20 +12,21 @@ export default function Inicio() {
     const [ligas, setLigas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [ligaSeleccionada, setLigaSeleccionada] = useState(null);
-    const { nombrePerfil } = useLocalSearchParams();
-    const navigation = useNavigation();
     const router = useRouter();
 
     const { setLiga } = useContext(LigaContext);
-
     const { user, logout } = useUser();
 
-    console.log('Usuario actual:', user);
+    // Estados para los Modals
+    const [modalCrearVisible, setModalCrearVisible] = useState(false);
+    const [nombreNuevaLiga, setNombreNuevaLiga] = useState("");
+
+    const [modalUnirseVisible, setModalUnirseVisible] = useState(false);
+    const [codigoLiga, setCodigoLiga] = useState("");
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const fetchLigas = async () => {
-        if (!user?.id) {
-            return;
-        }
+        if (!user?.id) return;
 
         setLoading(true);
         try {
@@ -41,7 +42,7 @@ export default function Inicio() {
             setLigaSeleccionada(data[0] || null);
             if (data[0]) setLiga(data[0]);
 
-        } catch (error) {
+        } catch (error: any) {
             alert('Error de red: ' + error.message);
         } finally {
             setLoading(false);
@@ -52,28 +53,22 @@ export default function Inicio() {
         if (user?.id) {
             fetchLigas();
         }
-    }, [user?.id]);
+    }, [user?.id, refreshKey]);
 
-    const crearLiga = async () => {
-        let nombreLiga: string | null = "";
-
-        if (isWeb) {
-            nombreLiga = window.prompt("Ingresa el nombre de la nueva liga:");
-            if (!nombreLiga) {
-                alert("Debes ingresar un nombre válido");
-                return;
-            }
-        } else {
-            alert('Implementa modal para móvil');
+    const confirmarCrearLiga = async () => {
+        if (!nombreNuevaLiga.trim()) {
+            alert("Debes ingresar un nombre válido");
             return;
         }
+
+        setModalCrearVisible(false);
 
         try {
             const res = await fetch("http://localhost:3000/crear-liga", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    nombre: nombreLiga,
+                    nombre: nombreNuevaLiga.trim(),
                     usuario_id: user?.id,
                 }),
             });
@@ -86,38 +81,34 @@ export default function Inicio() {
 
             const data = await res.json();
             alert("Liga creada: " + data.liga.nombre);
-            fetchLigas();
-        } catch (error) {
-            alert("Error de red: " + error.message);
-        }
+            setRefreshKey(prev => prev + 1);
 
-        const res = await fetch(`http://localhost:3000/player/${user?.nombre}/${nombreLiga}/points`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                usuario_id: user?.nombre,
-                nombre: nombreLiga
-            }),
-        });
-        console.log("res", res);
-        if (!res.ok) {
-            const errorData = await res.json();
-            alert("Error: " + (errorData.error?.message || "No se pudo assignar puntos iniciales"));
-            return;
+            const resPoints = await fetch(`http://localhost:3000/player/${user?.nombre}/${nombreNuevaLiga.trim()}/points`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    usuario_id: user?.nombre,
+                    nombre: nombreNuevaLiga.trim()
+                }),
+            });
+
+            if (!resPoints.ok) {
+                const errorData = await resPoints.json();
+                console.log("Error asignando puntos:", errorData);
+            }
+
+        } catch (error: any) {
+            alert("Error de red: " + error.message);
         }
     };
 
-    const unirseLiga = async () => {
-        let codigo: string | null = null;
-
-        if (isWeb) {
-            codigo = window.prompt("Introduce el código de la liga:");
-        } else {
-            alert("Implementa modal para móvil");
+    const confirmarUnirseLiga = async () => {
+        if (!codigoLiga.trim()) {
+            alert("Debes ingresar un código válido");
             return;
         }
 
-        if (!codigo) return;
+        setModalUnirseVisible(false);
 
         try {
             const res = await fetch("http://localhost:3000/unirse-liga", {
@@ -125,7 +116,7 @@ export default function Inicio() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     usuario_id: user?.id,
-                    codigo_liga: codigo.trim().toUpperCase(),
+                    codigo_liga: codigoLiga.trim().toUpperCase(),
                 }),
             });
 
@@ -137,21 +128,18 @@ export default function Inicio() {
             }
 
             alert("Te uniste a la liga correctamente");
-            fetchLigas();
+            setRefreshKey(prev => prev + 1);
 
-        } catch (err) {
+        } catch (err: any) {
             alert("Error de red: " + err.message);
         }
     };
 
-    const irAClasificacion = (liga) => {
+    const irAClasificacion = (liga: any) => {
         setLigaSeleccionada(liga);
         setLiga(liga);
 
-        router.push({
-            pathname: "/(tabs)/clasificacion",
-            params: { liga: JSON.stringify(liga) }
-        });
+        router.push(`/clasificacion?liga=${encodeURIComponent(JSON.stringify(liga))}` as any);
     };
 
     return (
@@ -177,12 +165,13 @@ export default function Inicio() {
                 )}
             </View>
 
+            {/* ⭐ BOTONES RESTAURADOS A TUS ESTILOS ORIGINALES */}
             <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
-                <TouchableOpacity style={styles.buton1} onPress={unirseLiga}>
+                <TouchableOpacity style={styles.buton1} onPress={() => { setCodigoLiga(""); setModalUnirseVisible(true); }}>
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.buton2} onPress={crearLiga}>
+                <TouchableOpacity style={styles.buton2} onPress={() => { setNombreNuevaLiga(""); setModalCrearVisible(true); }}>
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Crear liga</Text>
                 </TouchableOpacity>
             </View>
@@ -193,7 +182,7 @@ export default function Inicio() {
                 ) : ligas.length === 0 ? (
                     <Text style={{ color: 'white', textAlign: 'center' }}>No tienes ligas.</Text>
                 ) : (
-                    ligas.map((liga, index) => {
+                    ligas.map((liga: any, index) => {
                         const isSelected = ligaSeleccionada?.id === liga.id;
 
                         return (
@@ -223,11 +212,63 @@ export default function Inicio() {
                     })
                 )}
             </ScrollView>
+
+            {/* Modal Crear Liga */}
+            <Modal visible={modalCrearVisible} transparent={true} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Crear nueva liga</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nombre de la liga..."
+                            placeholderTextColor="#888"
+                            value={nombreNuevaLiga}
+                            onChangeText={setNombreNuevaLiga}
+                            autoFocus
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.btnCancel} onPress={() => setModalCrearVisible(false)}>
+                                <Text style={styles.btnText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.btnConfirm} onPress={confirmarCrearLiga}>
+                                <Text style={styles.btnText}>Crear</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Unirse a Liga */}
+            <Modal visible={modalUnirseVisible} transparent={true} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Unirse a una liga</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Ej: ABC123XYZ"
+                            placeholderTextColor="#888"
+                            value={codigoLiga}
+                            onChangeText={setCodigoLiga}
+                            autoCapitalize="characters"
+                            autoFocus
+                        />
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity style={styles.btnCancel} onPress={() => setModalUnirseVisible(false)}>
+                                <Text style={styles.btnText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.btnConfirm} onPress={confirmarUnirseLiga}>
+                                <Text style={styles.btnText}>Unirse</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    // ⭐ ESTILOS ORIGINALES RESTAURADOS
     buton1: {
         backgroundColor: '#3684B5',
         paddingVertical: 12,
@@ -290,5 +331,58 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         paddingVertical: 8,
         borderRadius: 8,
-    }
+    },
+
+    // Estilos de los Modals
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.7)",
+        justifyContent: "center",
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: "#1e1e1e",
+        borderRadius: 16,
+        padding: 24,
+    },
+    modalTitle: {
+        color: "white",
+        fontSize: 20,
+        fontWeight: "bold",
+        marginBottom: 16,
+        textAlign: "center"
+    },
+    input: {
+        backgroundColor: "#111",
+        color: "white",
+        borderWidth: 1,
+        borderColor: "#444",
+        padding: 14,
+        borderRadius: 10,
+        fontSize: 16,
+        marginBottom: 20,
+    },
+    modalButtons: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    btnCancel: {
+        flex: 1,
+        backgroundColor: "#444",
+        padding: 14,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+    btnConfirm: {
+        flex: 1,
+        backgroundColor: "#3684B5",
+        padding: 14,
+        borderRadius: 10,
+        alignItems: "center",
+    },
+    btnText: {
+        color: "white",
+        fontWeight: "bold",
+        fontSize: 16,
+    },
 });
