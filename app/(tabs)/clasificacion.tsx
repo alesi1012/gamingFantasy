@@ -15,13 +15,23 @@ type Miembro = {
 type OpcionApuesta = {
     id: string;
     titulo: string;
+    categoria: "CARDS" | "TROPHIES" | "ELIXIR";
     parametros?: {
         tipo: "numero" | "seleccion";
         label: string;
         key: string;
-        opciones?: string[];
+        opciones?: { label: string; value: string }[];
+        dependsOn?: { key: string; value: string };
     }[];
 };
+
+const OPCIONES_TEMPS = [
+    { label: "1 Hora", value: "1" },
+    { label: "12 Hores", value: "12" },
+    { label: "24 Hores", value: "24" },
+    { label: "3 Dies", value: "72" },
+    { label: "1 Setmana", value: "168" },
+];
 
 type MissionItem = {
     id: string;
@@ -46,21 +56,60 @@ const API_BASE = "http://localhost:3000";
 
 const OPCIONES_APUESTA: OpcionApuesta[] = [
     {
-        id: "ganar_partidas_carta",
-        titulo: "Ganar X partidas con Y carta",
+        id: "1",
+        titulo: "Repte de Cartes",
+        categoria: "CARDS",
         parametros: [
-            { tipo: "numero", label: "Nº de partidas", key: "partidas" },
-            { tipo: "seleccion", label: "Carta", key: "carta", opciones: ["Montapuercos", "P.E.K.K.A", "Barril de Duendes", "Minero", "Globo"] },
+            {
+                tipo: "seleccion",
+                label: "Objectiu",
+                key: "actionType",
+                opciones: [{ label: "Guanyar amb", value: "WIN" }, { label: "Jugar amb", value: "PLAY" }]
+            },
+            { tipo: "numero", label: "Nº de partides", key: "playsCount" },
+            {
+                tipo: "seleccion",
+                label: "Carta",
+                key: "cardId",
+                opciones: [
+                    { label: "Montapuercos", value: "26000021" },
+                    { label: "P.E.K.K.A", value: "26000004" },
+                    // Afegeix les teves cartes...
+                ]
+            },
         ],
     },
     {
-        id: "racha_victorias",
-        titulo: "Conseguir una racha de X victorias",
-        parametros: [{ tipo: "numero", label: "Victorias seguidas", key: "victorias" }],
+        id: "2",
+        titulo: "Repte de Trofeus",
+        categoria: "TROPHIES",
+        parametros: [
+            {
+                tipo: "seleccion",
+                label: "Tipus de repte",
+                key: "trophyMode",
+                opciones: [{ label: "Guanyar X trofeus", value: "GAIN" }, { label: "Arribar a X trofeus", value: "REACH" }]
+            },
+            { tipo: "numero", label: "Quantitat de trofeus", key: "trophyTarget" },
+        ],
     },
     {
-        id: "mas_coronas",
-        titulo: "Conseguirá más coronas esta semana",
+        id: "3",
+        titulo: "Repte d'Elixir",
+        categoria: "ELIXIR",
+        parametros: [
+            {
+                tipo: "seleccion",
+                label: "Tipus",
+                key: "elixirMode",
+                opciones: [{ label: "Sense malgastar (per partida)", value: "PER_MATCH" }, { label: "Malgastar en total", value: "TOTAL" }]
+            },
+            // Aquests dos només es mostren si trien "PER_MATCH"
+            { tipo: "numero", label: "Nº de partides", key: "playsCount", dependsOn: { key: "elixirMode", value: "PER_MATCH" } },
+            { tipo: "numero", label: "Límit d'elixir a malgastar (per partida)", key: "elixirLimit", dependsOn: { key: "elixirMode", value: "PER_MATCH" } },
+            // Aquest només es mostra si trien "TOTAL"
+            { tipo: "numero", label: "Elixir a malgastar en total", key: "totalElixir", dependsOn: { key: "elixirMode", value: "TOTAL" } },
+        ],
     },
 ];
 
@@ -69,6 +118,7 @@ export default function Clasificacion(): JSX.Element {
     const router = useRouter();
     const { user } = useUser();
     const { liga: ligaGlobal, setLiga } = useContext(LigaContext);
+    const [tempsLimit, setTempsLimit] = useState<string>("24");
 
     const rawLiga =
         typeof params.liga === "string"
@@ -108,6 +158,9 @@ export default function Clasificacion(): JSX.Element {
     const [reclamandoMissionId, setReclamandoMissionId] = useState<string | null>(null);
     const [nowTick, setNowTick] = useState(Date.now());
 
+    const [modalPendentsVisible, setModalPendentsVisible] = useState(false);
+    const [reptesPendents, setReptesPendents] = useState<any[]>([]);
+
     function toggleSeleccion(miembro: Miembro) {
         const existe = seleccionados.find((m) => m.id === miembro.id);
         if (existe) setSeleccionados((prev) => prev.filter((m) => m.id !== miembro.id));
@@ -119,6 +172,7 @@ export default function Clasificacion(): JSX.Element {
         setOpcionElegida(null);
         setParamsApuesta({});
         setCantidadPuntos("");
+        setTempsLimit("24");
         setModalApuestaVisible(true);
     }
 
@@ -173,31 +227,162 @@ export default function Clasificacion(): JSX.Element {
     }
 
     const apuestaValida = useMemo(() => {
-        if (!opcionElegida || !cantidadPuntos || isNaN(Number(cantidadPuntos))) return false;
+        if (!opcionElegida || !cantidadPuntos || isNaN(Number(cantidadPuntos)) || !tempsLimit) return false;
 
         const config = OPCIONES_APUESTA.find((o) => o.id === opcionElegida);
         if (config?.parametros) {
             for (const param of config.parametros) {
+                if (param.dependsOn && paramsApuesta[param.dependsOn.key] !== param.dependsOn.value) {
+                    continue;
+                }
                 if (!paramsApuesta[param.key]) return false;
             }
         }
 
         return true;
-    }, [opcionElegida, paramsApuesta, cantidadPuntos]);
+    }, [opcionElegida, paramsApuesta, cantidadPuntos, tempsLimit]);
 
-    function confirmarApuesta() {
-        if (!apuestaValida || !miembroApuesta) return;
+    async function carregarReptesPendents() {
+        if (!user?.id) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/Reptes/Pendents/${user.id}`);
+
+            if (!response.ok) throw new Error("Error en la petició al servidor");
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            setReptesPendents(data);
+
+            // Si l'usuari té reptes pendents, OBRIM EL POP-UP automàticament!
+            if (data && data.length > 0) {
+                setModalPendentsVisible(true);
+            }
+
+        } catch (error: any) {
+            console.error("Error carregant reptes pendents:", error.message);
+        }
+    }
+    function generarDescripcioRepte(repte: any) {
+        const dades = repte.specific_validation_data;
+        const categoria = repte.base_challenges?.validation_category;
+
+        if (categoria === 'CARDS') {
+            const accio = dades.actionType === 'WIN' ? "Guanyar" : "Jugar";
+            return `${accio} ${dades.playsCount} partides utilitzant una carta específica.`;
+        }
+
+        if (categoria === 'TROPHIES') {
+            if (dades.trophyMode === 'GAIN') {
+                return `Guanyar un total de ${dades.trophyTarget} trofeus en partides PvP.`;
+            } else {
+                return `Arribar a la xifra de ${dades.trophyTarget} trofeus abans que s'acabi el temps.`;
+            }
+        }
+
+        if (categoria === 'ELIXIR') {
+            if (dades.elixirMode === 'TOTAL') {
+                return `Malgastar més de ${dades.totalElixir} gotes d'elixir en total.`;
+            } else {
+                return `Guanyar ${dades.playsCount} partides sense malgastar més de ${dades.elixirLimit} d'elixir en cadascuna.`;
+            }
+        }
+
+        return "Objectiu no definit.";
+    }
+
+    async function respondreRepte(repteId: number, accio: "ACCEPTED" | "REJECTED") {
+        try {
+            const response = await fetch(`${API_BASE}/Reptes/Respondre`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    repteId,
+                    accio,
+                    userId: user?.id
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Error en respondre al repte");
+            }
+
+            // Si ha anat bé, traiem el repte de la llista visualment
+            setReptesPendents((prev) => prev.filter((r) => r.id !== repteId));
+            Alert.alert("Èxit", data.message);
+
+        } catch (error: any) {
+            console.error("Error responent:", error);
+            Alert.alert("Error", error.message);
+        }
+    }
+
+    async function confirmarApuesta() {
+        if (!apuestaValida || !miembroApuesta || !user) return;
 
         const config = OPCIONES_APUESTA.find((o) => o.id === opcionElegida);
+        if (!config) return;
 
-        console.log({
-            retado: miembroApuesta.nombre,
-            apuesta: config?.titulo,
-            detalles: paramsApuesta,
-            puntos: cantidadPuntos,
-        });
+        // Construïm validationType dinàmicament segons la categoria
+        let validationType: Record<string, any> = {};
 
-        Alert.alert("Apuesta enviada", `¡Apuesta enviada a ${miembroApuesta.nombre} por ${cantidadPuntos} puntos!`);
+        if (config.categoria === "CARDS") {
+            validationType = {
+                actionType: paramsApuesta.actionType, // "WIN" o "PLAY"
+                playsCount: Number(paramsApuesta.playsCount),
+                cardId: Number(paramsApuesta.cardId)
+            };
+        } else if (config.categoria === "TROPHIES") {
+            validationType = {
+                trophyMode: paramsApuesta.trophyMode, // "GAIN" o "REACH"
+                trophyTarget: Number(paramsApuesta.trophyTarget)
+            };
+        } else if (config.categoria === "ELIXIR") {
+            validationType = {
+                elixirMode: paramsApuesta.elixirMode, // "PER_MATCH" o "TOTAL"
+                // Només enviem els camps que toquen depenent del mode
+                ...(paramsApuesta.elixirMode === "PER_MATCH" && {
+                    playsCount: Number(paramsApuesta.playsCount),
+                    elixirLimit: Number(paramsApuesta.elixirLimit)
+                }),
+                ...(paramsApuesta.elixirMode === "TOTAL" && {
+                    totalElixir: Number(paramsApuesta.totalElixir)
+                })
+            };
+        }
+
+        // 2. Calculem el timeout en base a les hores triades tenint en compte la zona horària local
+        const timeoutHours = Number(tempsLimit);
+        const ara = new Date();
+
+        // Obtenim la diferència horària en mil·lisegons (per Espanya a l'estiu serà -7200000 ms)
+        const offsetLocal = ara.getTimezoneOffset() * 60 * 1000;
+
+        // Calculem els mil·lisegons totals: (Ara) - (Offset) + (Hores del repte)
+        const tempsFinalLocal = new Date(ara.getTime() - offsetLocal + (timeoutHours * 60 * 60 * 1000));
+
+        // Fem el toISOString però tallem l'últim caràcter (la 'Z') per enviar l'hora exacte d'aquí
+        // sense indicar que és UTC. Així el backend guardarà el número tal qual.
+        const timeoutDate = tempsFinalLocal.toISOString().slice(0, -1);
+
+        const payload = {
+            retador: user.id,
+            retat: miembroApuesta.id,
+            repteBase: config.id,
+            validationType: validationType,
+            reward: Number(cantidadPuntos),
+            timeout: timeoutDate
+        };
+
+        console.log("=== DADES ENVIADES AL BACKEND ===");
+        console.log(JSON.stringify(payload, null, 2));
+        console.log("=================================");
+
+        console.log("Payload enviat:", payload);
+        Alert.alert("Repte enviat", `Has reptat a ${miembroApuesta.nombre} per ${cantidadPuntos} punts!`);
         setModalApuestaVisible(false);
     }
 
@@ -350,6 +535,13 @@ export default function Clasificacion(): JSX.Element {
         fetchMiembros();
     }, [ligaObj?.id]);
 
+    // Comprovar reptes pendents en entrar a la lliga
+    useEffect(() => {
+        if (user?.id) {
+            carregarReptesPendents();
+        }
+    }, [user?.id]);
+
     useEffect(() => {
         const interval = setInterval(() => {
             setNowTick(Date.now());
@@ -382,15 +574,29 @@ export default function Clasificacion(): JSX.Element {
                 <Text style={styles.title}>Clasificación — {ligaObj.nombre}</Text>
 
                 <View style={styles.headerActions}>
+
+                    {/* BOTÓ DE NOTIFICACIONS / REPTES PENDENTS */}
                     <TouchableOpacity
                         style={styles.headerBtn}
                         onPress={() => {
-                            setModoSeleccion(!modoSeleccion);
-                            setSeleccionados([]);
+                            carregarReptesPendents();
+                            setModalPendentsVisible(true);
                         }}
                     >
-                        <Ionicons name={modoSeleccion ? "close-outline" : "stats-chart-outline"} size={20} color="white" />
+                        <Ionicons
+                            name={reptesPendents.length > 0 ? "notifications" : "notifications-outline"}
+                            size={20}
+                            color={reptesPendents.length > 0 ? "#FFD700" : "white"}
+                        />
+                        {reptesPendents.length > 0 && (
+                            <View style={{
+                                position: 'absolute', top: -2, right: -2,
+                                backgroundColor: 'red', width: 10, height: 10, borderRadius: 5
+                            }}/>
+                        )}
                     </TouchableOpacity>
+
+
 
                     <TouchableOpacity
                         style={styles.headerBtn}
@@ -494,6 +700,7 @@ export default function Clasificacion(): JSX.Element {
 
                             <Text style={styles.sectionLabel}>1. Elige el tipo de apuesta</Text>
 
+                            {/* --- INICI DEL BUCLE D'OPCIONS --- */}
                             {OPCIONES_APUESTA.map((opcion) => {
                                 const isSelected = opcionElegida === opcion.id;
 
@@ -512,48 +719,66 @@ export default function Clasificacion(): JSX.Element {
 
                                         {isSelected && opcion.parametros && (
                                             <View style={styles.subOptionsContainer}>
-                                                {opcion.parametros.map((param) => (
-                                                    <View key={param.key} style={styles.paramRow}>
-                                                        <Text style={styles.paramLabel}>{param.label}:</Text>
+                                                {opcion.parametros
+                                                    .filter(param => !param.dependsOn || paramsApuesta[param.dependsOn.key] === param.dependsOn.value)
+                                                    .map((param) => (
+                                                        <View key={param.key} style={styles.paramRow}>
+                                                            <Text style={styles.paramLabel}>{param.label}:</Text>
 
-                                                        {param.tipo === "numero" ? (
-                                                            <TextInput
-                                                                style={styles.paramInput}
-                                                                keyboardType="numeric"
-                                                                value={paramsApuesta[param.key] || ""}
-                                                                onChangeText={(val) => setParametro(param.key, val)}
-                                                            />
-                                                        ) : (
-                                                            <View style={styles.chipsContainer}>
-                                                                {param.opciones?.map((opt) => (
-                                                                    <TouchableOpacity
-                                                                        key={opt}
-                                                                        style={[styles.chip, paramsApuesta[param.key] === opt && styles.chipSelected]}
-                                                                        onPress={() => setParametro(param.key, opt)}
-                                                                    >
-                                                                        <Text style={styles.chipText}>{opt}</Text>
-                                                                    </TouchableOpacity>
-                                                                ))}
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                ))}
+                                                            {param.tipo === "numero" ? (
+                                                                <TextInput
+                                                                    style={styles.paramInput}
+                                                                    keyboardType="numeric"
+                                                                    value={paramsApuesta[param.key] || ""}
+                                                                    onChangeText={(val) => setParametro(param.key, val)}
+                                                                />
+                                                            ) : (
+                                                                <View style={styles.chipsContainer}>
+                                                                    {param.opciones?.map((opt) => (
+                                                                        <TouchableOpacity
+                                                                            key={opt.value}
+                                                                            style={[styles.chip, paramsApuesta[param.key] === opt.value && styles.chipSelected]}
+                                                                            onPress={() => setParametro(param.key, opt.value)}
+                                                                        >
+                                                                            <Text style={styles.chipText}>{opt.label}</Text>
+                                                                        </TouchableOpacity>
+                                                                    ))}
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    ))}
                                             </View>
                                         )}
                                     </View>
                                 );
                             })}
+                            {/* --- FI DEL BUCLE D'OPCIONS --- */}
 
-                            <Text style={styles.sectionLabel}>2. ¿Cuántos puntos apuestas?</Text>
+                            {/* --- APARTATS GLOBALS (FORA DEL BUCLE) --- */}
+                            <Text style={styles.sectionLabel}>2. Temps límit per complir-ho</Text>
+                            <View style={styles.chipsContainer}>
+                                {OPCIONES_TEMPS.map((opt) => (
+                                    <TouchableOpacity
+                                        key={opt.value}
+                                        style={[styles.chip, tempsLimit === opt.value && styles.chipSelected]}
+                                        onPress={() => setTempsLimit(opt.value)}
+                                    >
+                                        <Text style={styles.chipText}>{opt.label}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            <Text style={styles.sectionLabel}>3. ¿Quants punts apostes?</Text>
                             <TextInput
                                 style={styles.puntosInput}
                                 keyboardType="numeric"
                                 value={cantidadPuntos}
                                 onChangeText={setCantidadPuntos}
-                                placeholder="Ej: 20"
+                                placeholder="Ex: 20"
                                 placeholderTextColor="#888"
                             />
 
+                            {/* --- BOTONS D'ACCIÓ --- */}
                             <View style={styles.modalActions}>
                                 <TouchableOpacity style={[styles.modalBtn, styles.btnCancel]} onPress={() => setModalApuestaVisible(false)}>
                                     <Text style={styles.btnText}>Cancelar</Text>
@@ -569,6 +794,69 @@ export default function Clasificacion(): JSX.Element {
                             </View>
                         </View>
                     </ScrollView>
+                </View>
+            </Modal>
+
+            <Modal visible={modalPendentsVisible} transparent animationType="fade" onRequestClose={() => setModalPendentsVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>📩 Reptes Rebuts</Text>
+
+                        <ScrollView style={{ maxHeight: 450, width: '100%' }}>
+                            {reptesPendents.length === 0 ? (
+                                <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>No tens cap repte pendent ara mateix.</Text>
+                            ) : (
+                                reptesPendents.map((repte) => (
+                                    <View key={repte.id} style={[styles.optionContainer, { borderLeftWidth: 4, borderLeftColor: '#FFD700', padding: 15 }]}>
+
+                                        {/* ENCAPÇALAMENT: QUI REPTA */}
+                                        <Text style={{ fontSize: 16, color: '#fff', marginBottom: 5 }}>
+                                            <Text style={{ fontWeight: 'bold', color: '#4FC3F7' }}>{repte.challenger?.nombre}</Text>
+                                        </Text>
+
+                                        {/* EL TEXT "MACO" QUE HEM GENERAT */}
+                                        <Text style={{ fontSize: 18, color: '#FFD700', fontWeight: '600', marginBottom: 10 }}>
+                                            {generarDescripcioRepte(repte)}
+                                        </Text>
+
+                                        {/* DETALLS DE RECOMPENSA I TEMPS */}
+                                        <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 8 }}>
+                                            <Text style={{ color: '#aaa', fontSize: 14 }}>
+                                                💰 Recompensa: <Text style={{ color: '#fff', fontWeight: 'bold' }}>{repte.reward_amount} punts</Text>
+                                            </Text>
+                                            <Text style={{ color: '#aaa', fontSize: 14 }}>
+                                                ⏰ Tens fins: <Text style={{ color: '#fff' }}>{new Date(repte.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                                            </Text>
+                                        </View>
+
+                                        {/* BOTONS D'ACCIÓ */}
+                                        <View style={[styles.modalActions, { marginTop: 15 }]}>
+                                            <TouchableOpacity
+                                                style={[styles.modalBtn, styles.btnCancel, { flex: 1, marginRight: 5, backgroundColor: '#c62828' }]}
+                                                onPress={() => respondreRepte(repte.id, "REJECTED")}
+                                            >
+                                                <Text style={styles.btnText}>Rebutjar</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                style={[styles.modalBtn, styles.btnConfirm, { flex: 1, marginLeft: 5, backgroundColor: '#2e7d32' }]}
+                                                onPress={() => respondreRepte(repte.id, "ACCEPTED")}
+                                            >
+                                                <Text style={styles.btnText}>Acceptar</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                ))
+                            )}
+                        </ScrollView>
+
+                        <TouchableOpacity
+                            style={[styles.modalBtn, styles.btnCancel, { marginTop: 20, width: '100%', backgroundColor: '#555' }]}
+                            onPress={() => setModalPendentsVisible(false)}
+                        >
+                            <Text style={styles.btnText}>Tancar</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </Modal>
 
