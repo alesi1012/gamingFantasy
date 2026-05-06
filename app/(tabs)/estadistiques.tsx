@@ -64,7 +64,7 @@ export default function Estadistiques() {
             const json = await res.json();
             setIaResult(json);
         } catch (err) {
-            setIaResult({ ia: { score: 0, evaluacion: "Error ❌" }, mazo: [] });
+            setIaResult({ ia: { score: 0, evaluacion: "Error " }, mazo: [] });
         } finally {
             setIaLoading(false);
         }
@@ -94,7 +94,7 @@ export default function Estadistiques() {
         <ScrollView style={styles.container}>
             {/* Botón IA */}
             <TouchableOpacity style={styles.iaButton} onPress={analizarMazoIA}>
-                <Text style={styles.iaButtonText}>Analizar Mazo 🧠</Text>
+                <Text style={styles.iaButtonText}>Analizar Mazo </Text>
             </TouchableOpacity>
 
             {/* Modal IA */}
@@ -126,7 +126,7 @@ export default function Estadistiques() {
 
                                 {iaResult?.mazo?.length > 0 ? (
                                     <>
-                                        <Text style={styles.subTitle}>Cartas en el mazo:</Text>
+                                        <Text style={styles.subTitle}>Cartas en el mazo:</Text>+
                                         {iaResult.mazo.map((c) => (
                                             <Text key={c.id} style={styles.carta}>
                                                 {c.name} (Elixir: {c.elixir})
