@@ -54,65 +54,6 @@ type MissionItem = {
 
 const API_BASE = "http://localhost:3000";
 
-const OPCIONES_APUESTA: OpcionApuesta[] = [
-    {
-        id: "1",
-        titulo: "Repte de Cartes",
-        categoria: "CARDS",
-        parametros: [
-            {
-                tipo: "seleccion",
-                label: "Objectiu",
-                key: "actionType",
-                opciones: [{ label: "Guanyar amb", value: "WIN" }, { label: "Jugar amb", value: "PLAY" }]
-            },
-            { tipo: "numero", label: "Nº de partides", key: "playsCount" },
-            {
-                tipo: "seleccion",
-                label: "Carta",
-                key: "cardId",
-                opciones: [
-                    { label: "Montapuercos", value: "26000021" },
-                    { label: "P.E.K.K.A", value: "26000004" },
-                    // Afegeix les teves cartes...
-                ]
-            },
-        ],
-    },
-    {
-        id: "2",
-        titulo: "Repte de Trofeus",
-        categoria: "TROPHIES",
-        parametros: [
-            {
-                tipo: "seleccion",
-                label: "Tipus de repte",
-                key: "trophyMode",
-                opciones: [{ label: "Guanyar X trofeus", value: "GAIN" }, { label: "Arribar a X trofeus", value: "REACH" }]
-            },
-            { tipo: "numero", label: "Quantitat de trofeus", key: "trophyTarget" },
-        ],
-    },
-    {
-        id: "3",
-        titulo: "Repte d'Elixir",
-        categoria: "ELIXIR",
-        parametros: [
-            {
-                tipo: "seleccion",
-                label: "Tipus",
-                key: "elixirMode",
-                opciones: [{ label: "Sense malgastar (per partida)", value: "PER_MATCH" }, { label: "Malgastar en total", value: "TOTAL" }]
-            },
-            // Aquests dos només es mostren si trien "PER_MATCH"
-            { tipo: "numero", label: "Nº de partides", key: "playsCount", dependsOn: { key: "elixirMode", value: "PER_MATCH" } },
-            { tipo: "numero", label: "Límit d'elixir a malgastar (per partida)", key: "elixirLimit", dependsOn: { key: "elixirMode", value: "PER_MATCH" } },
-            // Aquest només es mostra si trien "TOTAL"
-            { tipo: "numero", label: "Elixir a malgastar en total", key: "totalElixir", dependsOn: { key: "elixirMode", value: "TOTAL" } },
-        ],
-    },
-];
-
 const MAPA_CARTES: Record<number, string> = {
     // --- TROPES (260000...) ---
     26000000: "Knight",
@@ -240,6 +181,60 @@ const MAPA_CARTES: Record<number, string> = {
     28000022: "Goblin Curse"
 };
 
+const OPCIONES_APUESTA: OpcionApuesta[] = [
+    {
+        id: "1",
+        titulo: "Repte de Cartes",
+        categoria: "CARDS",
+        parametros: [
+            {
+                tipo: "seleccion",
+                label: "Objectiu",
+                key: "actionType",
+                opciones: [{ label: "Guanyar amb", value: "WIN" }, { label: "Jugar amb", value: "PLAY" }]
+            },
+            { tipo: "numero", label: "Nº de partides", key: "playsCount" },
+            {
+                tipo: "seleccion",
+                label: "Carta",
+                key: "cardId",
+                opciones: Object.entries(MAPA_CARTES).map(([id, name]) => ({ label: name, value: id.toString() }))
+            },
+        ],
+    },
+    {
+        id: "2",
+        titulo: "Repte de Trofeus",
+        categoria: "TROPHIES",
+        parametros: [
+            {
+                tipo: "seleccion",
+                label: "Tipus de repte",
+                key: "trophyMode",
+                opciones: [{ label: "Guanyar X trofeus", value: "GAIN" }, { label: "Arribar a X trofeus", value: "REACH" }]
+            },
+            { tipo: "numero", label: "Quantitat de trofeus", key: "trophyTarget" },
+        ],
+    },
+    {
+        id: "3",
+        titulo: "Repte d'Elixir",
+        categoria: "ELIXIR",
+        parametros: [
+            {
+                tipo: "seleccion",
+                label: "Tipus",
+                key: "elixirMode",
+                opciones: [{ label: "Sense malgastar (per partida)", value: "PER_MATCH" }, { label: "Malgastar en total", value: "TOTAL" }]
+            },
+            // Aquests dos només es mostren si trien "PER_MATCH"
+            { tipo: "numero", label: "Nº de partides", key: "playsCount", dependsOn: { key: "elixirMode", value: "PER_MATCH" } },
+            { tipo: "numero", label: "Límit d'elixir a malgastar (per partida)", key: "elixirLimit", dependsOn: { key: "elixirMode", value: "PER_MATCH" } },
+            // Aquest només es mostra si trien "TOTAL"
+            { tipo: "numero", label: "Elixir a malgastar en total", key: "totalElixir", dependsOn: { key: "elixirMode", value: "TOTAL" } },
+        ],
+    },
+];
 
 export default function Clasificacion(): JSX.Element {
     const params = useLocalSearchParams();
@@ -293,6 +288,7 @@ export default function Clasificacion(): JSX.Element {
 
     const [modalPendentsVisible, setModalPendentsVisible] = useState(false);
     const [reptesPendents, setReptesPendents] = useState<any[]>([]);
+    const [filtroCarta, setFiltroCarta] = useState("");
 
     function toggleSeleccion(miembro: Miembro) {
         const existe = seleccionados.find((m) => m.id === miembro.id);
@@ -306,6 +302,7 @@ export default function Clasificacion(): JSX.Element {
         setParamsApuesta({});
         setCantidadPuntos("");
         setTempsLimit("24");
+        setFiltroCarta("");
         setModalApuestaVisible(true);
     }
 
@@ -1168,17 +1165,35 @@ export default function Clasificacion(): JSX.Element {
                                                                     onChangeText={(val) => setParametro(param.key, val)}
                                                                 />
                                                             ) : (
-                                                                <View style={styles.chipsContainer}>
-                                                                    {param.opciones?.map((opt) => (
-                                                                        <TouchableOpacity
-                                                                            key={opt.value}
-                                                                            style={[styles.chip, paramsApuesta[param.key] === opt.value && styles.chipSelected]}
-                                                                            onPress={() => setParametro(param.key, opt.value)}
-                                                                        >
-                                                                            <Text style={styles.chipText}>{opt.label}</Text>
-                                                                        </TouchableOpacity>
-                                                                    ))}
-                                                                </View>
+                                                                <>
+                                                                    {param.key === "cardId" && (
+                                                                        <TextInput
+                                                                            style={[styles.paramInput, { marginBottom: 10, fontSize: 14 }]}
+                                                                            placeholder="Cerca una carta..."
+                                                                            placeholderTextColor="#888"
+                                                                            value={filtroCarta}
+                                                                            onChangeText={setFiltroCarta}
+                                                                        />
+                                                                    )}
+                                                                    <ScrollView style={{ maxHeight: 80 }} nestedScrollEnabled={true}>
+                                                                        <View style={styles.chipsContainer}>
+                                                                            {param.opciones
+                                                                                ?.filter(opt =>
+                                                                                    param.key !== "cardId" ||
+                                                                                    opt.label.toLowerCase().includes(filtroCarta.toLowerCase())
+                                                                                )
+                                                                                .map((opt) => (
+                                                                                    <TouchableOpacity
+                                                                                        key={opt.value}
+                                                                                        style={[styles.chip, paramsApuesta[param.key] === opt.value && styles.chipSelected]}
+                                                                                        onPress={() => setParametro(param.key, opt.value)}
+                                                                                    >
+                                                                                        <Text style={styles.chipText}>{opt.label}</Text>
+                                                                                    </TouchableOpacity>
+                                                                                ))}
+                                                                        </View>
+                                                                    </ScrollView>
+                                                                </>
                                                             )}
                                                         </View>
                                                     ))}
