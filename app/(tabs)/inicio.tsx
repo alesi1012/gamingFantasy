@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { View, Text, TouchableOpacity, StatusBar, Platform, StyleSheet, ScrollView, Modal, TextInput } from 'react-native';
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useNavigation } from '@react-navigation/native';
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { LigaContext } from "./_layout";
 import { useUser } from "../UserContext";
 
 const isWeb = Platform.OS === 'web';
+const API_URL = Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
 
 export default function Inicio() {
     const [ligas, setLigas] = useState([]);
@@ -17,7 +17,6 @@ export default function Inicio() {
     const { setLiga } = useContext(LigaContext);
     const { user, logout } = useUser();
 
-    // Estados para los Modals
     const [modalCrearVisible, setModalCrearVisible] = useState(false);
     const [nombreNuevaLiga, setNombreNuevaLiga] = useState("");
 
@@ -27,21 +26,18 @@ export default function Inicio() {
 
     const fetchLigas = async () => {
         if (!user?.id) return;
-
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/mis-ligas-id/${user.id}`);
+            const res = await fetch(`${API_URL}/mis-ligas-id/${user.id}`);
             if (!res.ok) {
                 alert('Error al cargar ligas');
                 setLoading(false);
                 return;
             }
-
             const data = await res.json();
             setLigas(data);
             setLigaSeleccionada(data[0] || null);
             if (data[0]) setLiga(data[0]);
-
         } catch (error: any) {
             alert('Error de red: ' + error.message);
         } finally {
@@ -50,9 +46,7 @@ export default function Inicio() {
     };
 
     useEffect(() => {
-        if (user?.id) {
-            fetchLigas();
-        }
+        if (user?.id) fetchLigas();
     }, [user?.id, refreshKey]);
 
     const confirmarCrearLiga = async () => {
@@ -60,43 +54,30 @@ export default function Inicio() {
             alert("Debes ingresar un nombre válido");
             return;
         }
-
         setModalCrearVisible(false);
-
         try {
-            const res = await fetch("http://localhost:3000/crear-liga", {
+            const res = await fetch(`${API_URL}/crear-liga`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    nombre: nombreNuevaLiga.trim(),
-                    usuario_id: user?.id,
-                }),
+                body: JSON.stringify({ nombre: nombreNuevaLiga.trim(), usuario_id: user?.id }),
             });
-
             if (!res.ok) {
                 const errorData = await res.json();
                 alert("Error: " + (errorData.error?.message || "No se pudo crear la liga"));
                 return;
             }
-
             const data = await res.json();
             alert("Liga creada: " + data.liga.nombre);
             setRefreshKey(prev => prev + 1);
-
-            const resPoints = await fetch(`http://localhost:3000/player/${user?.nombre}/${nombreNuevaLiga.trim()}/points`, {
+            const resPoints = await fetch(`${API_URL}/player/${user?.nombre}/${nombreNuevaLiga.trim()}/points`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    usuario_id: user?.nombre,
-                    nombre: nombreNuevaLiga.trim()
-                }),
+                body: JSON.stringify({ usuario_id: user?.nombre, nombre: nombreNuevaLiga.trim() }),
             });
-
             if (!resPoints.ok) {
                 const errorData = await resPoints.json();
                 console.log("Error asignando puntos:", errorData);
             }
-
         } catch (error: any) {
             alert("Error de red: " + error.message);
         }
@@ -107,29 +88,20 @@ export default function Inicio() {
             alert("Debes ingresar un código válido");
             return;
         }
-
         setModalUnirseVisible(false);
-
         try {
-            const res = await fetch("http://localhost:3000/unirse-liga", {
+            const res = await fetch(`${API_URL}/unirse-liga`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    usuario_id: user?.id,
-                    codigo_liga: codigoLiga.trim().toUpperCase(),
-                }),
+                body: JSON.stringify({ usuario_id: user?.id, codigo_liga: codigoLiga.trim().toUpperCase() }),
             });
-
             const data = await res.json();
-
             if (!res.ok) {
                 alert(data.error || "Error al unirse");
                 return;
             }
-
             alert("Te uniste a la liga correctamente");
             setRefreshKey(prev => prev + 1);
-
         } catch (err: any) {
             alert("Error de red: " + err.message);
         }
@@ -138,74 +110,78 @@ export default function Inicio() {
     const irAClasificacion = (liga: any) => {
         setLigaSeleccionada(liga);
         setLiga(liga);
-
         router.push(`/clasificacion?liga=${encodeURIComponent(JSON.stringify(liga))}` as any);
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: 'black' }}>
-            <StatusBar backgroundColor={'#000'} />
+        <View style={{ flex: 1, backgroundColor: '#0A1628' }}>
+            <StatusBar backgroundColor="#0A1628" barStyle="light-content" />
 
-            <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
-                <Text style={{ color: '#fff', fontSize: 32, fontWeight: 'bold' }}>
-                    Fantasy Gamer
-                </Text>
-
+            {/* HEADER */}
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Fantasy Gamer</Text>
                 {user && (
                     <TouchableOpacity
                         style={styles.logoutButton}
-                        onPress={() => {
-                            logout();
-                            alert('Sesión cerrada');
-                            router.replace('/');
-                        }}
+                        onPress={() => { logout(); alert('Sesión cerrada'); router.replace('/'); }}
                     >
-                        <Text style={{ color: 'white', fontWeight: 'bold' }}>Cerrar sesión</Text>
+                        <Ionicons name="log-out-outline" size={16} color="white" style={{ marginRight: 4 }} />
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>Salir</Text>
                     </TouchableOpacity>
                 )}
             </View>
 
-            {/* ⭐ BOTONES RESTAURADOS A TUS ESTILOS ORIGINALES */}
-            <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 20 }}>
-                <TouchableOpacity style={styles.buton1} onPress={() => { setCodigoLiga(""); setModalUnirseVisible(true); }}>
-                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a una liga</Text>
+            {/* BOTONES */}
+            <View style={styles.actionsRow}>
+                <TouchableOpacity
+                    style={styles.buton1}
+                    onPress={() => { setCodigoLiga(""); setModalUnirseVisible(true); }}
+                >
+                    <Ionicons name="enter-outline" size={16} color="white" style={{ marginRight: 6 }} />
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Unirse a liga</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.buton2} onPress={() => { setNombreNuevaLiga(""); setModalCrearVisible(true); }}>
+                <TouchableOpacity
+                    style={styles.buton2}
+                    onPress={() => { setNombreNuevaLiga(""); setModalCrearVisible(true); }}
+                >
+                    <Ionicons name="add-circle-outline" size={16} color="white" style={{ marginRight: 6 }} />
                     <Text style={{ color: 'white', fontWeight: 'bold' }}>Crear liga</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.container}>
                 {loading ? (
-                    <Text style={{ color: 'white', textAlign: 'center' }}>Cargando ligas...</Text>
+                    <Text style={{ color: '#6B8BA4', textAlign: 'center', marginTop: 20 }}>Cargando ligas...</Text>
                 ) : ligas.length === 0 ? (
-                    <Text style={{ color: 'white', textAlign: 'center' }}>No tienes ligas.</Text>
+                    <View style={styles.emptyBox}>
+                        <Ionicons name="trophy-outline" size={40} color="#6B8BA4" />
+                        <Text style={{ color: '#6B8BA4', marginTop: 12, fontSize: 15 }}>No tienes ligas aún.</Text>
+                    </View>
                 ) : (
                     ligas.map((liga: any, index) => {
                         const isSelected = ligaSeleccionada?.id === liga.id;
-
                         return (
                             <TouchableOpacity
                                 key={liga.id || index}
                                 style={[styles.card, isSelected ? styles.cardSelected : styles.cardBlue]}
-                                onPress={() => {
-                                    setLigaSeleccionada(liga);
-                                    setLiga(liga);
-                                }}
+                                onPress={() => { setLigaSeleccionada(liga); setLiga(liga); }}
                             >
                                 <View style={styles.infoContainer}>
-                                    <View style={[styles.avatar, { backgroundColor: isSelected ? "#ccc" : "#0D47A1" }]} />
+                                    <View style={[styles.avatar, { backgroundColor: isSelected ? "#3B82F6" : "#1E3A5F" }]}>
+                                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>
+                                            {liga.nombre?.[0]?.toUpperCase() ?? "L"}
+                                        </Text>
+                                    </View>
                                     <View>
-                                        <Text style={[styles.title, !isSelected && { color: 'white' }]}>{liga.nombre}</Text>
-                                        <Text style={[styles.subtitle, !isSelected && { color: 'white' }]}>
-                                            Miembros: {liga.miembros}/14  Pts: {liga.puntos}
+                                        <Text style={[styles.title, { color: 'white' }]}>{liga.nombre}</Text>
+                                        <Text style={[styles.subtitle, { color: '#6B8BA4' }]}>
+                                            👥 {liga.miembros}/14 · 🏆 {liga.puntos} pts
                                         </Text>
                                     </View>
                                 </View>
-
-                                <TouchableOpacity onPress={() => irAClasificacion(liga)}>
-                                    <Ionicons name="stats-chart" size={24} color={isSelected ? "#555" : "white"} />
+                                <TouchableOpacity onPress={() => irAClasificacion(liga)} style={styles.statsButton}>
+                                    <Ionicons name="stats-chart" size={18} color={isSelected ? "#3B82F6" : "#6B8BA4"} />
                                 </TouchableOpacity>
                             </TouchableOpacity>
                         );
@@ -268,44 +244,80 @@ export default function Inicio() {
 }
 
 const styles = StyleSheet.create({
-    // ⭐ ESTILOS ORIGINALES RESTAURADOS
-    buton1: {
-        backgroundColor: '#3684B5',
-        paddingVertical: 12,
-        paddingHorizontal: 25,
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 12,
+    },
+    headerTitle: {
+        color: '#fff',
+        fontSize: 26,
+        fontWeight: 'bold',
+        letterSpacing: 0.3,
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#7F1D1D',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
         borderRadius: 8,
-        marginRight: isWeb ? 400 : 80,
+    },
+    actionsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 12,
+        paddingHorizontal: 20,
+        marginBottom: 16,
+    },
+    buton1: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#111D35',
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#1E3A5F',
     },
     buton2: {
-        backgroundColor: '#3684B5',
-        paddingVertical: 12,
-        paddingHorizontal: 30,
-        borderRadius: 8,
-        width: 150,
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center'
+        backgroundColor: '#3B82F6',
+        paddingVertical: 12,
+        borderRadius: 10,
     },
     container: {
-        padding: 20,
-        gap: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 32,
+        gap: 12,
+    },
+    emptyBox: {
+        alignItems: 'center',
+        marginTop: 60,
     },
     card: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
         padding: 16,
-        borderRadius: 12,
-        backgroundColor: "#fff",
-        elevation: 3,
-        marginBottom: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#1E3A5F',
     },
     cardSelected: {
-        borderWidth: 2,
-        borderColor: "#9C27B0",
-        backgroundColor: "white"
+        backgroundColor: "#111D35",
+        borderColor: "#3B82F6",
     },
     cardBlue: {
-        backgroundColor: "#1565C0",
+        backgroundColor: "#111D35",
+        borderColor: "#1E3A5F",
     },
     infoContainer: {
         flexDirection: "row",
@@ -313,50 +325,54 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     title: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: "600",
+        color: 'white',
     },
     subtitle: {
         fontSize: 12,
-        opacity: 0.7,
+        color: '#6B8BA4',
+        marginTop: 2,
     },
-    logoutButton: {
-        marginTop: 10,
-        backgroundColor: '#d33',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
+    statsButton: {
+        padding: 8,
+        backgroundColor: '#0A1628',
         borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#1E3A5F',
     },
-
-    // Estilos de los Modals
     modalOverlay: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.7)",
+        backgroundColor: "rgba(0,0,0,0.75)",
         justifyContent: "center",
-        padding: 20,
+        padding: 24,
     },
     modalContent: {
-        backgroundColor: "#1e1e1e",
+        backgroundColor: "#111D35",
         borderRadius: 16,
         padding: 24,
+        borderWidth: 1,
+        borderColor: '#1E3A5F',
     },
     modalTitle: {
         color: "white",
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: "bold",
         marginBottom: 16,
-        textAlign: "center"
+        textAlign: "center",
     },
     input: {
-        backgroundColor: "#111",
+        backgroundColor: "#0A1628",
         color: "white",
         borderWidth: 1,
-        borderColor: "#444",
+        borderColor: "#1E3A5F",
         padding: 14,
         borderRadius: 10,
         fontSize: 16,
@@ -368,14 +384,16 @@ const styles = StyleSheet.create({
     },
     btnCancel: {
         flex: 1,
-        backgroundColor: "#444",
+        backgroundColor: "#1E2A3A",
         padding: 14,
         borderRadius: 10,
         alignItems: "center",
+        borderWidth: 1,
+        borderColor: '#1E3A5F',
     },
     btnConfirm: {
         flex: 1,
-        backgroundColor: "#3684B5",
+        backgroundColor: "#3B82F6",
         padding: 14,
         borderRadius: 10,
         alignItems: "center",
@@ -383,6 +401,6 @@ const styles = StyleSheet.create({
     btnText: {
         color: "white",
         fontWeight: "bold",
-        fontSize: 16,
+        fontSize: 15,
     },
 });

@@ -1,9 +1,9 @@
 import {View, Text, TouchableOpacity, StatusBar, TextInput, Image, Platform, ScrollView} from 'react-native';
 import type {ViewStyle} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {router} from "expo-router";
 import {useEffect, useState} from "react";
 import { useUser } from './UserContext';
-
 
 export default function Inici_sessio() {
     const { user, setUser } = useUser();
@@ -12,19 +12,14 @@ export default function Inici_sessio() {
         : {width: "100%"};
 
     const [Usuari, setUsuari] = useState("");
-
     const [Contrasenya, setContrasenya] = useState("");
 
-    const [loged, setLoged] = useState(false);
     useEffect(() => {
         if (user) {
-
-            router.replace({
-                pathname: "/inicio",
-                params: { nombrePerfil: user.nombre }
-            });
+            router.replace({ pathname: "/inicio", params: { nombrePerfil: user.nombre } });
         }
     }, [user]);
+
     function iniciarSessio() {
         fetch("http://localhost:3000/login", {
             method: "POST",
@@ -34,93 +29,61 @@ export default function Inici_sessio() {
             .then(res => res.json())
             .then(data => {
                 console.log("Respuesta login:", data);
-                if (data.error) {
-                    alert(data.error);
-                } else if (data.usuari) {
+                if (data.error) { alert(data.error); }
+                else if (data.usuari) {
                     alert('Usuari iniciat sessió correctamente');
                     setUser(data.usuari);
-                    router.push({
-                        pathname: '/inicio',
-                        params: { nombrePerfil: data.usuari.nombre }
-                    });
+                    router.push({ pathname: '/inicio', params: { nombrePerfil: data.usuari.nombre } });
                 }
             })
-            .catch(err => {
-                console.error(err);
-                alert("Error de connexió");
-            });
-
+            .catch(err => { console.error(err); alert("Error de connexió"); });
     }
 
-
     return (
-        <ScrollView style={{backgroundColor: 'black'}}>
-            <View style={{flex: 1, backgroundColor: 'black', justifyContent: 'center', paddingHorizontal: 30}}>
-                <StatusBar/>
-                <View style={{alignItems: 'center', marginBottom: 40}}>
-                    <Text style={{color: '#fff', fontSize: 50, fontWeight: 'bold'}}>
-                        Fantasy Gamer
-                    </Text>
-                </View>
-                <View style={[containerStyle]}>
-                    <Text style={{color: '#fff', fontSize: 18, marginBottom: 5}}>Usuari</Text>
-                    <TextInput
-                        placeholder="Usuari"
-                        placeholderTextColor="#bbb"
-                        style={{
-                            backgroundColor: '#1c1c1c',
-                            color: 'white',
-                            padding: 12,
-                            borderRadius: 8,
-                            marginBottom: 20,
-                            fontSize: 16,
-                        }}
-                        onChangeText={(text) => setUsuari(text)}
-                    />
-                    <Text style={{color: '#fff', fontSize: 18, marginBottom: 5}}>Contrasenya</Text>
-                    <TextInput
-                        placeholder="Contrasenya"
-                        placeholderTextColor="#bbb"
-                        secureTextEntry
-                        style={{
-                            backgroundColor: '#1c1c1c',
-                            color: 'white',
-                            padding: 12,
-                            borderRadius: 8,
-                            marginBottom: 30,
-                            fontSize: 16,
-                        }}
-                        onChangeText={(text) => setContrasenya(text)}
-
-                    />
-                    <TouchableOpacity
-                        style={{
-                            backgroundColor: '#3684B5',
-                            paddingVertical: 15,
-                            borderRadius: 10,
-                            alignItems: 'center',
-                        }}
-                        onPress={() => {
-                            console.log({Usuari}, {Contrasenya})
-                            if (Usuari && Contrasenya) {
-                                iniciarSessio();
-                            } else {
-                                alert('Camps buits');
-                            }
-                        }}
-                    >
-                        <Text style={{color: 'white', fontWeight: 'bold', fontSize: 20}}>
-                            Iniciar sessió
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }} edges={['top']}>
+            <StatusBar backgroundColor="black" barStyle="light-content"/>
+            <ScrollView style={{backgroundColor: 'black'}}>
+                <View style={{flex: 1, backgroundColor: 'black', justifyContent: 'center', paddingHorizontal: 30}}>
+                    <View style={{alignItems: 'center', marginBottom: 40}}>
+                        <Text style={{color: '#fff', fontSize: 50, fontWeight: 'bold'}}>
+                            Fantasy Gamer
                         </Text>
-                    </TouchableOpacity>
+                    </View>
+                    <View style={[containerStyle]}>
+                        <Text style={{color: '#fff', fontSize: 18, marginBottom: 5}}>Usuari</Text>
+                        <TextInput
+                            placeholder="Usuari"
+                            placeholderTextColor="#bbb"
+                            style={{ backgroundColor: '#1c1c1c', color: 'white', padding: 12, borderRadius: 8, marginBottom: 20, fontSize: 16 }}
+                            onChangeText={(text) => setUsuari(text)}
+                        />
+                        <Text style={{color: '#fff', fontSize: 18, marginBottom: 5}}>Contrasenya</Text>
+                        <TextInput
+                            placeholder="Contrasenya"
+                            placeholderTextColor="#bbb"
+                            secureTextEntry
+                            style={{ backgroundColor: '#1c1c1c', color: 'white', padding: 12, borderRadius: 8, marginBottom: 30, fontSize: 16 }}
+                            onChangeText={(text) => setContrasenya(text)}
+                        />
+                        <TouchableOpacity
+                            style={{ backgroundColor: '#3684B5', paddingVertical: 15, borderRadius: 10, alignItems: 'center' }}
+                            onPress={() => {
+                                console.log({Usuari}, {Contrasenya})
+                                if (Usuari && Contrasenya) { iniciarSessio(); }
+                                else { alert('Camps buits'); }
+                            }}
+                        >
+                            <Text style={{color: 'white', fontWeight: 'bold', fontSize: 20}}>Iniciar sessió</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <View style={{alignItems: 'center', marginTop: 40}}>
+                        <Image
+                            source={require('../assets/images/user.jpg')}
+                            style={{width: 150, height: 150, borderRadius: 75, opacity: 0.8}}
+                        />
+                    </View>
                 </View>
-                <View style={{alignItems: 'center', marginTop: 40}}>
-                    <Image
-                        source={require('../assets/images/user.jpg')}
-                        style={{width: 150, height: 150, borderRadius: 75, opacity: 0.8}}
-                    />
-                </View>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
 }

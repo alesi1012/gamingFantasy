@@ -6,12 +6,12 @@ import {
     ScrollView,
     StyleSheet,
     ActivityIndicator,
-    Alert
+    Alert, Platform
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useUser } from "../UserContext";
 
-const API_URL = "http://localhost:3000";
+const API_URL = Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000";
 
 type Liga = {
     id: number;
@@ -39,24 +39,18 @@ export default function Botiga() {
     useEffect(() => {
         const cargarDatos = async () => {
             if (!user?.id) return;
-
             try {
                 setLoading(true);
-
                 const [ligasRes, boostsRes] = await Promise.all([
                     fetch(`${API_URL}/mis-ligas-id/${user.id}`),
                     fetch(`${API_URL}/Boosts/Catalogo`)
                 ]);
-
                 const ligasJson = await ligasRes.json();
                 const boostsJson = await boostsRes.json();
-
                 const ligasData = Array.isArray(ligasJson) ? ligasJson : [];
                 const boostsData = boostsJson?.boosts || [];
-
                 setLigas(ligasData);
                 setCatalogo(boostsData);
-
                 if (ligasData.length > 0) {
                     setSelectedLigaId(Number(ligasData[0].id));
                 }
@@ -67,7 +61,6 @@ export default function Botiga() {
                 setLoading(false);
             }
         };
-
         cargarDatos();
     }, [user?.id]);
 
@@ -80,34 +73,22 @@ export default function Botiga() {
             Alert.alert("Error", "Selecciona una liga");
             return;
         }
-
         if ((ligaSeleccionada?.puntos ?? 0) < price) {
             Alert.alert("Puntos insuficientes", "No tienes suficientes puntos en esta liga");
             return;
         }
-
         try {
             setBuyingId(boostId);
-
             const res = await fetch(`${API_URL}/Boosts/Comprar`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    userId: user.id,
-                    ligaId: selectedLigaId,
-                    boostId
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: user.id, ligaId: selectedLigaId, boostId })
             });
-
             const data = await res.json();
-
             if (!res.ok || !data?.ok) {
                 Alert.alert("Error", data?.error || "No se pudo comprar el boost");
                 return;
             }
-
             setLigas((prev) =>
                 prev.map((liga) =>
                     liga.id === selectedLigaId
@@ -115,7 +96,6 @@ export default function Botiga() {
                         : liga
                 )
             );
-
             Alert.alert("Compra correcta", "Boost comprado y guardado en el inventario de esta liga");
         } catch (error) {
             console.error("Error comprando boost:", error);
@@ -128,7 +108,7 @@ export default function Botiga() {
     if (loading) {
         return (
             <View style={[styles.container, styles.center]}>
-                <ActivityIndicator size="large" color="#fff" />
+                <ActivityIndicator size="large" color="#3B82F6" />
                 <Text style={styles.loadingText}>Cargando tienda...</Text>
             </View>
         );
@@ -143,13 +123,12 @@ export default function Botiga() {
     }
 
     return (
-        <ScrollView style={styles.container}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
             <Text style={styles.title}>Tienda</Text>
 
             <Text style={styles.sectionTitle}>Liga seleccionada</Text>
             <View style={styles.box}>
-                <Text style={styles.boxText}>Elige una liga</Text>
-
+                <Text style={styles.boxLabel}>Elige una liga</Text>
                 <View style={styles.pickerWrapper}>
                     <Picker
                         selectedValue={selectedLigaId}
@@ -158,26 +137,23 @@ export default function Botiga() {
                         dropdownIconColor="#263fa0"
                     >
                         {ligas.map((liga) => (
-                            <Picker.Item
-                                key={liga.id}
-                                label={liga.nombre}
-                                value={liga.id}
-                                color="#111"
-                            />
+                            <Picker.Item key={liga.id} label={liga.nombre} value={liga.id} color="#111" />
                         ))}
                     </Picker>
                 </View>
-
-                <Text style={styles.boxSubText}>
-                    Liga actual: {ligaSeleccionada?.nombre || "-"}
-                </Text>
-                <Text style={styles.boxSubText}>
-                    Puntos disponibles: {ligaSeleccionada?.puntos ?? 0}
-                </Text>
+                <View style={styles.infoRow}>
+                    <View style={styles.infoChip}>
+                        <Text style={styles.infoChipLabel}>Liga</Text>
+                        <Text style={styles.infoChipValue}>{ligaSeleccionada?.nombre || "-"}</Text>
+                    </View>
+                    <View style={styles.infoChip}>
+                        <Text style={styles.infoChipLabel}>Puntos</Text>
+                        <Text style={styles.infoChipValue}>{ligaSeleccionada?.puntos ?? 0}</Text>
+                    </View>
+                </View>
             </View>
 
             <Text style={styles.sectionTitle}>Boosts disponibles</Text>
-
             <View style={styles.statsGrid}>
                 {catalogo.map((boost) => {
                     const disabled =
@@ -192,19 +168,19 @@ export default function Botiga() {
                             <Text style={styles.statLabel}>Descripción</Text>
                             <Text style={styles.statDescription}>{boost.description}</Text>
 
-                            <Text style={styles.statLabel}>Precio</Text>
-                            <Text style={styles.statValue}>{boost.price} pts</Text>
-
-                            <Text style={styles.statLabel}>Efecto</Text>
-                            <Text style={styles.statValue}>
-                                x{boost.multiplier || 1} en misiones de hoy
-                            </Text>
+                            <View style={styles.statRow}>
+                                <View style={styles.statChip}>
+                                    <Text style={styles.statChipLabel}>Precio</Text>
+                                    <Text style={styles.statChipValue}>{boost.price} pts</Text>
+                                </View>
+                                <View style={styles.statChip}>
+                                    <Text style={styles.statChipLabel}>Efecto</Text>
+                                    <Text style={styles.statChipValue}>×{boost.multiplier || 1}</Text>
+                                </View>
+                            </View>
 
                             <Pressable
-                                style={[
-                                    styles.button,
-                                    disabled && styles.buttonDisabled
-                                ]}
+                                style={[styles.button, disabled && styles.buttonDisabled]}
                                 onPress={() => comprarBoost(boost.id, boost.price)}
                                 disabled={disabled}
                             >
@@ -223,113 +199,159 @@ export default function Botiga() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#1e1e1e",
-        padding: 16
+        backgroundColor: "#0A1628",
+        paddingHorizontal: 16,
+        paddingTop: 20,
     },
     center: {
         justifyContent: "center",
-        alignItems: "center"
+        alignItems: "center",
     },
     loadingText: {
-        marginTop: 10,
-        color: "white",
-        fontSize: 16
+        marginTop: 12,
+        color: "#6B8BA4",
+        fontSize: 15,
     },
     title: {
-        fontSize: 28,
+        fontSize: 26,
         fontWeight: "bold",
-        color: "white",
-        marginBottom: 20
+        color: "#FFFFFF",
+        marginBottom: 24,
+        letterSpacing: 0.3,
     },
     sectionTitle: {
-        color: "white",
-        fontSize: 20,
-        marginBottom: 10
+        color: "#6B8BA4",
+        fontSize: 12,
+        fontWeight: "700",
+        letterSpacing: 1.2,
+        textTransform: "uppercase",
+        marginBottom: 10,
     },
     box: {
-        backgroundColor: "#263fa0",
+        backgroundColor: "#111D35",
         padding: 16,
-        borderRadius: 12,
-        marginBottom: 20
+        borderRadius: 14,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: "#1E3A5F",
     },
-    boxText: {
-        color: "white",
-        fontSize: 18,
-        fontWeight: "bold",
-        marginBottom: 10
+    boxLabel: {
+        color: "#6B8BA4",
+        fontSize: 13,
+        marginBottom: 10,
     },
-    boxSubText: {
-        color: "white",
-        fontSize: 16,
-        marginTop: 8
+    infoRow: {
+        flexDirection: "row",
+        gap: 10,
+        marginTop: 14,
+    },
+    infoChip: {
+        flex: 1,
+        backgroundColor: "#0A1628",
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: "#1E3A5F",
+    },
+    infoChipLabel: {
+        color: "#6B8BA4",
+        fontSize: 11,
+        marginBottom: 2,
+    },
+    infoChipValue: {
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontWeight: "600",
     },
     pickerWrapper: {
-        width: 180,
-        height: 40,
+        width: "100%",
+        height: 44,
         backgroundColor: "#ffffff",
         borderRadius: 10,
         overflow: "hidden",
-        borderWidth: 1,
-        borderColor: "#d9d9d9",
         justifyContent: "center",
-        alignSelf: "flex-start"
     },
     picker: {
-        width: 180,
-        height: 40,
+        width: "100%",
+        height: 44,
         color: "#111",
-        backgroundColor: "#ffffff"
+        backgroundColor: "#ffffff",
     },
     statsGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
         justifyContent: "space-between",
-        marginBottom: 20
+        marginBottom: 20,
     },
     statBox: {
         width: "48%",
-        backgroundColor: "#ececec",
-        borderRadius: 12,
+        backgroundColor: "#111D35",
+        borderRadius: 14,
         padding: 14,
-        marginBottom: 12
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: "#1E3A5F",
     },
     statLabel: {
-        fontSize: 13,
-        color: "#555",
-        marginBottom: 4
+        fontSize: 11,
+        color: "#6B8BA4",
+        marginBottom: 3,
+        fontWeight: "600",
+        letterSpacing: 0.5,
+        textTransform: "uppercase",
     },
     statTitle: {
-        fontSize: 17,
+        fontSize: 15,
         fontWeight: "bold",
-        marginBottom: 10
+        color: "#FFFFFF",
+        marginBottom: 10,
     },
     statDescription: {
-        fontSize: 14,
-        color: "#333",
-        marginBottom: 10
+        fontSize: 12,
+        color: "#6B8BA4",
+        marginBottom: 12,
+        lineHeight: 17,
     },
-    statValue: {
-        fontSize: 17,
-        fontWeight: "bold",
-        marginBottom: 10
+    statRow: {
+        flexDirection: "row",
+        gap: 8,
+        marginBottom: 12,
+    },
+    statChip: {
+        flex: 1,
+        backgroundColor: "#0A1628",
+        borderRadius: 8,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: "#1E3A5F",
+    },
+    statChipLabel: {
+        color: "#6B8BA4",
+        fontSize: 10,
+        marginBottom: 2,
+    },
+    statChipValue: {
+        color: "#3B82F6",
+        fontWeight: "700",
+        fontSize: 14,
     },
     button: {
-        marginTop: 8,
-        backgroundColor: "#263fa0",
-        paddingVertical: 12,
+        backgroundColor: "#3B82F6",
+        paddingVertical: 11,
         borderRadius: 10,
-        alignItems: "center"
+        alignItems: "center",
     },
     buttonDisabled: {
-        opacity: 0.5
+        opacity: 0.4,
     },
     buttonText: {
         color: "#fff",
-        fontWeight: "700"
+        fontWeight: "700",
+        fontSize: 13,
     },
     emptyText: {
-        color: "white",
-        fontSize: 16,
-        textAlign: "center"
-    }
+        color: "#6B8BA4",
+        fontSize: 15,
+        textAlign: "center",
+    },
 });
